@@ -39,6 +39,8 @@ This skill changes GitHub. Step 5 edits the body, the routing fields and the sta
 Every comment starts with the line `_Written by an agent._`.
 The skill never builds the issue and never merges.
 
+Write no code for an issue that taskrock claim did not take: its Status is In Progress and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers close, and an issue in Triage waits until taskrock-triage sets it to Todo.
+
 ## Procedure
 
 ### 0. Check the taskrock version
@@ -119,6 +121,12 @@ gh issue list --repo <owner>/<repo> --state closed --search "<words> reason:not-
 
 Open each hit that looks the same and read its reason.
 
+4. When the title starts with a lowercase letter that is not the name of the repository, fix it first:
+
+```sh
+gh issue edit <link> --title "<title>"
+```
+
 Write down what you established. Each fact is a command and its output, or a file and a line.
 
 ### 5. Decide
@@ -176,7 +184,7 @@ gh project item-edit --project-id <project id> --id <item id> --field-id <Status
 taskrock ready <project link>
 ```
 
-A Feature that is too big for one task gets sub-issues instead of Steps. Make a folder outside the repository with `plan.toml` (a new `id`, plus `repo` and `project`) (add `milestone = "<title>"` when the Feature has a milestone: `gh issue view <link> --json milestone --jq .milestone.title`) and one file for each sub-issue, each with `parent = "<link of the Feature>"`. Write each sub-issue as `taskrock-plan` does. The folder holds the sub-issues only, never the Feature. Then:
+A Feature that is too big for one task gets sub-issues instead of Steps. Make a folder outside the repository with `plan.toml` (a new `id`, plus `repo` and `project`) (add `milestone = "<title>"` when the Feature has a milestone: `gh issue view <link> --json milestone --jq .milestone.title`) and one file for each sub-issue, each with `parent = "<link of the Feature>"`. Write each sub-issue as `taskrock-plan` does. A title starts with a capital letter, a digit or a code span in backticks. A lowercase letter is allowed only for the name of the repository, as in "taskrock 0.2.1: …". The folder holds the sub-issues only, never the Feature. Then:
 
 ```sh
 taskrock check <folder>
@@ -230,5 +238,6 @@ Make sure that each item is true:
 - Each rejected issue has a comment with the reason, and is closed as not planned.
 - Every comment you posted starts with `_Written by an agent._`.
 - You changed an issue body only with `taskrock edit`, and created sub-issues only with `taskrock apply`.
+- You wrote no code for the issue.
 - You did not build the issue.
 - The next step of each Ready issue names the skill `taskrock-issue` or `taskrock-goal`.

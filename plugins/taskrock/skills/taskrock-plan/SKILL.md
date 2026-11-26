@@ -192,6 +192,7 @@ For any other type, run `taskrock template <type> --owner <owner>` and write the
 
 How to write a task:
 
+- **Title.** A title starts with a capital letter, a digit or a code span in backticks. A lowercase letter is allowed only for the name of the repository, as in "taskrock 0.2.1: …".
 - **Outcome.** What works when the task is finished.
 - **Decisions already made.** Every file, type, function, command and message the builder must use. The builder decides nothing.
 - **Steps.** The order of work.

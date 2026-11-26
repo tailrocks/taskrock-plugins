@@ -70,14 +70,25 @@ The last command prints who builds and who reviews. Read `AGENTS.md` in the repo
 
 ### 3. Take the task
 
-Skip this step when the manager told you that the task is already taken for you.
+When the manager told you that the task is already taken for you, do not claim it again. Check the claim yourself before you build:
+
+```sh
+gh issue view <link> --json projectItems --jq '.projectItems[] | "\(.title): \(.status.name)"'
+gh api repos/<owner>/<repo>/branches/feat/issue-<number> --jq .name
+```
+
+The line of the delivery project must say `In Progress`, and the second command must print `feat/issue-<number>`. When either differs, write no code and stop: say that the task is not claimed.
+
+Otherwise claim it:
 
 ```sh
 taskrock claim <link>
 ```
 
 - Exit status 0: the task is yours. Its branch `feat/issue-<number>` exists on GitHub.
-- Exit status 3: the answer is no. Another agent has it, its status is not Todo, or a blocker is still open. Stop and say so.
+- Exit status 3: the answer is no. Another agent has it, its status is not Todo, or a blocker is still open. Stop and say so. When the issue is a Bug or a Feature in Triage, load the skill `taskrock-triage` with it instead, and stop this one.
+
+Write no code for an issue that taskrock claim did not take: its Status is In Progress and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers close, and an issue in Triage waits until taskrock-triage sets it to Todo.
 
 ### 4. Switch to the branch
 
@@ -181,6 +192,8 @@ milestone = "<title of the milestone of your task>"
 
 When your task has no parent or no milestone, leave out that line.
 
+A title starts with a capital letter, a digit or a code span in backticks. A lowercase letter is allowed only for the name of the repository, as in "taskrock 0.2.1: …".
+
 ```sh
 taskrock apply <folder>
 ```
@@ -202,6 +215,7 @@ Make sure that each item is true:
 - You checked that the link belongs to this skill.
 - You read the issue and every comment.
 - `taskrock claim` exited with status 0, or the manager had taken the task for you.
+- You wrote code only after taskrock claim exited with 0, or after the manager told you that it took the task for you.
 - You merged the default branch into the task branch and ran every command under `Done when` again, and saw its result yourself.
 - The pull request body has the sections `Why`, `What`, `Proof`, and `Done when`, and the line `Closes #<number>`.
 - When you stopped before the pull request, the note has the sections `Done`, `Verified`, `State` and `Next step`, and `taskrock release <link> --note <file>` ran.

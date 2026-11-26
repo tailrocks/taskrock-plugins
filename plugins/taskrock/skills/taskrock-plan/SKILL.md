@@ -75,7 +75,7 @@ Keep these blocks of the file:
 - `[[routing.model]]`: each model with its `runtimes`, `efforts` and `use`.
 - `[[issue_type]]`: the sections of each type.
 
-When the file is missing, tell the user so. Then use `taskrock template <type>` (without `--owner`) for the formats of the issues, and read the routing values with the command in step 5.
+When the file is missing, tell the user so and ask them to run `taskrock setup <owner>` or the `taskrock-setup` skill. Do not route from any other source. Stop here until the config exists.
 
 ### 3. Find the project
 
@@ -130,12 +130,6 @@ Route each task from the blocks of the config. Choose in this order:
 4. An effort from the `efforts` of that model.
 
 The reviewer is a subagent whose `can` has `review`. Its model is not the model of the builder. Choose its runtime, model and effort in the same order.
-
-With no config, read the allowed values from the account:
-
-```sh
-gh api orgs/<owner>/issue-fields --jq '.[] | "\(.name): \([.options[].name] | join(", "))"'
-```
 
 ### 6. Write the draft
 
@@ -252,7 +246,7 @@ Print the link of the initiative and the link of the project. Delete the draft f
 
 Make sure that each item is true:
 
-- You read the config, or told the user that it is missing.
+- You read the config, or told the user to set up the organization and stopped.
 - The project is a delivery project of the config, never a portfolio project.
 - You asked only questions that no command could answer, in rounds with a recommended answer.
 - You ran `taskrock check <folder> --coverage` and fixed each note or gave the reason it stays.

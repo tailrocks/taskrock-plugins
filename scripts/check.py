@@ -123,6 +123,81 @@ def routing() -> None:
             problem(path, "does not contain the text of scripts/routing.md")
 
 
+BANNED_IN_SKILLS = [
+    (
+        re.compile(r"(?:do not|don't|never)\s+make\s+this\s+task\s+wait", re.I),
+        "a finding must not run outside the goal",
+    ),
+    (
+        re.compile(r"(?:^|\n)\s*(?:[-*]|\d+\.)?\s*defer\b|\bdefer\s*[:\u2013\u2014-]", re.I),
+        "has a `Defer:` route. A follow-up is filed under the link and built in the run",
+    ),
+    (
+        re.compile(
+            r"(?:bugs?|friction)[^.\n]{0,80}?(?:do(?:es)?\s+not|don't|doesn't|never|not)\s+count(?:ed)?\b"
+            r"|no\s+milestone,?\s+so\b",
+            re.I,
+        ),
+        "says that Bugs do not count or have no milestone",
+    ),
+]
+BUILD_REQUEST = re.compile(
+    r"\b(?:do|implement|build)\s+(?:`?<[^>`]*(?:link|url)[^>`]*>`?|`?https?://\S+)", re.I
+)
+SKILL_NAME = re.compile(r"taskrock-(?:goal|issue|plan|triage|setup)")
+MARKUP = re.compile(r"[*_`]")
+
+
+def sentences(text: str) -> list[str]:
+    """Split Markdown into sentences. A wrapped paragraph and a folded front-matter value join up."""
+    units: list[str] = []
+    paragraph: list[str] = []
+    fenced = False
+
+    def flush() -> None:
+        if paragraph:
+            units.extend(re.split(r"(?<=[.!?])\s+(?=[A-Z\"`<])", " ".join(paragraph)))
+            paragraph.clear()
+
+    for line in text.splitlines():
+        if line.lstrip().startswith("```"):
+            flush()
+            fenced = not fenced
+        elif fenced:
+            units.append(line)
+        elif not line.strip():
+            flush()
+        elif re.match(r"\s*(?:[-*]\s|\d+\.\s|\||#)", line):
+            flush()
+            paragraph.append(line.strip())
+        else:
+            paragraph.append(line.strip())
+    flush()
+    return units
+
+
+def scope() -> None:
+    """A build request names its skill, and no skill sends a finding outside the goal."""
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        text = MARKUP.sub("", path.read_text())
+        flat = re.sub(r"[ \t]+", " ", text)
+        for pattern, why in BANNED_IN_SKILLS:
+            match = pattern.search(flat)
+            if match:
+                problem(path, f"contains `{match.group(0).strip()}`: {why}")
+    docs = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md")), *sorted(SKILLS.glob("*/SKILL.md"))]
+    for path in docs:
+        text = path.read_text()
+        for sentence in sentences(text):
+            found = BUILD_REQUEST.search(sentence)
+            if found and not SKILL_NAME.search(sentence):
+                at = text.find(sentence.strip()[:20])
+                if at < 0:
+                    at = max(text.find(found.group(0)), 0)
+                line = text.count("\n", 0, at) + 1
+                problem(path, f"line {line} tells the user to type `{found.group(0).strip('`')}` without naming a taskrock skill")
+
+
 def tailrocks() -> None:
     for path in ROOT.rglob("*"):
         relative = path.relative_to(ROOT)
@@ -142,6 +217,7 @@ def main() -> int:
     commands()
     gh_issue()
     routing()
+    scope()
     tailrocks()
     for line in problems:
         print(line)

@@ -14,6 +14,17 @@ The commands below were run on 2026-11-26 with the versions in the table. Each a
 
 If you installed the old plugin `tailrocks-taskrock-skills`, remove it first. Both plugins have the same skill names. The remove command for each agent is under its section.
 
+## Build planned work
+
+Name the skill in every request. The generic form works in all five agents. Each agent also has its own form.
+
+| Agent | One task | A whole initiative, epic or project |
+| --- | --- | --- |
+| Claude Code | `/taskrock:taskrock-issue <link>` | `/taskrock:taskrock-goal <link>`, or `/goal /taskrock:taskrock-goal <link>` |
+| Codex | `$taskrock:taskrock-issue <link>` | `$taskrock:taskrock-goal <link>` |
+| Grok Build, Muse Code, Antigravity | `/taskrock-issue <link>` | `/taskrock-goal <link>` |
+| Any agent | "use the skill taskrock-issue with `<link>`" | "use the skill taskrock-goal with `<link>`" |
+
 ## Claude Code
 
 ```sh

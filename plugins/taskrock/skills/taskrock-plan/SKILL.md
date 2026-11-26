@@ -1,7 +1,7 @@
 ---
 name: taskrock-plan
 description: >-
-  Turn the work discussed in this conversation into a taskrock plan on GitHub: an initiative, epics and tasks with blockers and routing. Use when the user asks to plan work. It never builds: a link of an issue or project goes to taskrock-goal or taskrock-issue.
+  Turn the work discussed in this conversation into a taskrock plan on GitHub: an initiative, epics and tasks with blockers and routing. Use when the user asks to plan work. Call it with /taskrock:taskrock-plan (Claude Code), $taskrock:taskrock-plan (Codex), /taskrock-plan (Grok Build, Muse Code, Antigravity), or "use the skill taskrock-plan". It never builds: a link of an issue or project goes to taskrock-goal or taskrock-issue.
 license: Apache-2.0
 ---
 
@@ -27,7 +27,7 @@ If the link belongs to another skill, load that skill and stop this one.
 
 You turn what the user explained into issues on GitHub. Another agent, on a weaker model, builds each task later with no other context. So you make every design decision now and write it into the task.
 
-Use this skill when the user asks to plan work on GitHub or types `/taskrock-plan`.
+Use this skill when the user asks to plan work on GitHub, says "use the skill taskrock-plan", or types `/taskrock:taskrock-plan` (Claude Code), `$taskrock:taskrock-plan` (Codex) or `/taskrock-plan` (Grok Build, Muse Code, Antigravity).
 This skill only plans. Use `taskrock-issue` to build one task. Use `taskrock-goal` to build a whole plan.
 
 ## Before you start
@@ -179,6 +179,13 @@ For any other type, run `taskrock template <type> --owner <owner>` and write the
 - Every section that does not apply says `None.` and the reason. Never leave a section out.
 - An `Initiative` or `Epic` has no routing key.
 - An Initiative has the sections Outcome, Why, Not yet specified, Out of scope and Done when.
+- Every issue of the plan, the Initiative and the Epics too, has a `milestone`. Its title is listed under `[[milestones]]` in `plan.toml`.
+- The Done when of an Initiative starts with this line: `Friction: a Bug that an agent files while it builds this initiative is filed under this initiative, with its milestone. It counts. The initiative is not done while it is open.` Never write that such Bugs are left out of the count.
+- The last box of the Done when of an Initiative counts the open issues of its milestone in every repository of the project, and the open issues under it. The Initiative has the milestone itself and is open while its box is checked, so in the repository of the Initiative the count leaves the Initiative out, by its number. In every other repository the count is plain:
+
+```text
+- [ ] For each repository of the project: `gh api "repos/<owner>/<repo>/milestones?state=all" --paginate --jq '.[].title'` lists `<milestone>` (a repository without the milestone fails this box). In each repository except the one of the Initiative: `gh issue list --repo <owner>/<repo> --milestone "<milestone>" --state open --json number --jq length` prints `0`. In the repository of the Initiative: `gh issue list --repo <owner>/<repo> --milestone "<milestone>" --state open --json number --jq '[.[] | select(.number != <initiative number>)] | length'` prints `0`. For the initiative and for each Epic, open or closed: `gh api repos/<owner>/<repo>/issues/<number>/sub_issues --paginate --jq '[.[] | select(.state == "open")] | length'` prints `0`
+```
 - An Epic has the sections Outcome, Decisions already made, Not yet specified, Out of scope and Done when.
 - Do not write "Decisions so far" in a parent. The manager appends it later: one line for each closed child.
 - An owner task has `agent = "Owner"` and no other routing key. Its sections are Outcome, Question, Why it matters, Recommended answer and Done when. Run `taskrock template owner --owner <owner>` for them.
@@ -240,7 +247,14 @@ Once a task is In Progress, `taskrock edit` refuses to change its Outcome, Decis
 
 ## Result
 
-Print the link of the initiative and the link of the project. Delete the draft folder.
+Print the link of the initiative and the link of the project. Delete the draft folder. Then tell the user how to build it, and name the skill each time:
+
+- To build the whole plan with `taskrock-goal`:
+  - Claude Code: `/taskrock:taskrock-goal <initiative link>`, or `/goal /taskrock:taskrock-goal <initiative link>` for a long build.
+  - Codex: `$taskrock:taskrock-goal <initiative link>`.
+  - Grok Build, Muse Code and Antigravity: `/taskrock-goal <initiative link>`.
+  - Any agent: "use the skill taskrock-goal with <initiative link>".
+- To build one task with `taskrock-issue`: Claude Code `/taskrock:taskrock-issue <task link>`, Codex `$taskrock:taskrock-issue <task link>`, Grok Build, Muse Code and Antigravity `/taskrock-issue <task link>`, any agent "use the skill taskrock-issue with <task link>".
 
 ## Completion checks
 
@@ -253,5 +267,6 @@ Make sure that each item is true:
 - The user approved the tree.
 - `taskrock check` printed `OK` for the draft folder.
 - `taskrock apply` finished without an error.
-- You printed the link of the initiative and the link of the project.
+- Each issue has a milestone, and the Initiative's Done when has the Friction line and the last box that counts open issues.
+- You printed the link of the initiative and the link of the project, and the lines that name `taskrock-goal` and `taskrock-issue`.
 - You deleted the draft folder.

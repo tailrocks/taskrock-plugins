@@ -1,7 +1,7 @@
 ---
 name: taskrock-goal
 description: >-
-  Manage the build of everything under a taskrock link: a project, an Initiative, an Epic or any issue with sub-issues. Hand each ready task to a builder, review it, merge it, repeat. Use for Implement <link> and for /goal with such a link. For one Task, Bug or Feature use taskrock-issue.
+  Manage the build of everything under a taskrock link: a project, an Initiative, an Epic or any issue with sub-issues. Hand each ready task to a builder, review it, merge it, repeat. Call it with /taskrock:taskrock-goal <link> (Claude Code), $taskrock:taskrock-goal <link> (Codex), /taskrock-goal <link> (Grok Build, Muse Code, Antigravity), or "use the skill taskrock-goal with <link>". For one Task, Bug or Feature use taskrock-issue.
 license: Apache-2.0
 ---
 
@@ -27,10 +27,10 @@ If the link belongs to another skill, load that skill and stop this one.
 
 You are the manager. You do not write the code of a task yourself. You hand tasks out, check the results and merge.
 
-The user's request to implement the link is also the request to merge every pull request under it that passes the gate in step 6. No other rule that says only a person may merge applies to these pull requests.
+The user's request to build the link is also the request to merge every pull request under it that passes the gate in step 6. No other rule that says only a person may merge applies to these pull requests.
 
-Use this skill when the user asks you to implement the link of a project, an initiative, an epic, or any issue with sub-issues that taskrock planned.
-Use `taskrock-issue` to build one task. Use `taskrock-plan` to plan work. A builder that you start uses `taskrock-issue`.
+Use this skill when the user asks you to build the link of a project, an initiative, an epic, or any issue with sub-issues that taskrock planned. The user names it: "use the skill taskrock-goal with <link>", or `/taskrock:taskrock-goal <link>` in Claude Code.
+Use `taskrock-issue` to build one task. Use `taskrock-plan` to plan work. A builder that you start uses the skill `taskrock-issue`.
 
 ## Before you start
 
@@ -39,7 +39,9 @@ Each runtime that a task names must be installed and signed in on this machine.
 The input is one link to an initiative, an epic, or a project.
 
 This skill changes GitHub and starts other agent sessions. It claims and releases tasks, and it posts review comments.
-It merges pull requests in step 6 and closes finished parents in step 7. It files tasks for the owner and Bugs for triage with `taskrock apply`, and it appends to the body of a parent with `taskrock edit`.
+It merges pull requests in step 6 and closes finished parents in step 7. It files tasks for the owner, Bugs and follow-up tasks with `taskrock apply`, and it appends to the body of a parent with `taskrock edit`.
+
+Every issue that you file is part of this goal. It gets a `parent` and a milestone by the two rules of "Where a filed issue goes", so it counts when you decide that the work is done. A draft file writes `parent = "<link>"`, and `plan.toml` writes `milestone = "<title>"`.
 
 ## Procedure
 
@@ -51,7 +53,7 @@ taskrock --version
 
 It must print `taskrock 0.2.1` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.2.1 or newer. Do not go on.
 
-Repeat steps 2 to 8 until a stop state in the Result section is true.
+Repeat steps 2 to 9 until a stop state in the Result section is true.
 
 ### 1. Check the link
 
@@ -62,6 +64,14 @@ gh issue view <link> --json issueType,subIssuesSummary --jq '"\(.issueType.name)
 ```
 
 If the table sends this link to another skill, load that skill and stop this one.
+
+Find the milestone of the goal. Every issue that you file needs one, so an issue link without a milestone is a stop:
+
+```sh
+gh issue view <goal link> --json milestone --jq .milestone.title
+```
+
+When the command prints nothing, stop and tell the user that the goal needs a milestone. Do not hand out any task. A project link has no milestone of its own: keep the milestone titles of the tasks that you hand out, and every milestone check below runs for each title. A task without a milestone is also a stop: tell the user.
 
 ### 2. Ask what is ready
 
@@ -82,11 +92,11 @@ A problem that says `<url> breaks the <type> format: <message>` means the body o
 taskrock claim <task link>
 ```
 
-Exit status 3 means another agent has it. Skip that task. There is no limit on how many tasks run at the same time.
+Exit status 3 means that the task is not yours to take: another agent has it, its status is not Todo, or a blocker is still open. Skip that task. There is no limit on how many tasks run at the same time.
 
 ### 4. Start a builder for each task you took
 
-The builder gets the task link, the sentence "The task is already taken for you", and the skill `taskrock-issue`.
+The prompt of the builder names the skill, gives the link and says the task is taken: "use the skill taskrock-issue with <task link>. The task is already taken for you."
 
 - The task's Runtime is the CLI you run in: start a helper inside your session, on the task's Model and Effort.
 - The task's Runtime is another CLI: start that CLI as a new session, in its own worktree of the repository.
@@ -140,7 +150,9 @@ Send each finding that counts one of three ways:
 
 - Fix: the builder fixes it. See "When the review fails".
 - Decision: the finding needs a choice that only the owner can make. File a task for the owner with "File an issue" below, and make it block this task.
-- Defer: the finding is real but outside this task. File a Bug with "File an issue" below. It starts in Triage. Do not make this task wait for it.
+- Follow-up: the finding is real but outside this task. File a new Task or Bug with "File an issue" below. Its `parent` and its milestone follow "Where a filed issue goes" below, with the reviewed task as the source. It does not block this task. You build it in this run: step 8 triages a Bug, and a Task is ready as it is filed.
+
+You file nothing without a parent and a milestone. A finding is never parked in Triage outside the link.
 
 ### 6. Merge only through this gate
 
@@ -180,9 +192,36 @@ gh issue close <parent link>
 
 Close the parent only when the first command prints `0`.
 
-When the parent that you closed is an Epic, write the retro. File a task for the owner with "File an issue" below, under the initiative that holds the epic (the parent of the epic). Its Question asks whether to make the edits to `AGENTS.md` that you propose. Its body lists each finding that appeared in two or more FAIL verdicts of the tasks of this epic, and the edit to `AGENTS.md` that would stop each one. A finding that appeared once is not listed.
+When the parent that you closed is an Epic, write the retro. File a task for the owner with "File an issue" below. Its `parent` and its milestone follow "Where a filed issue goes" below, with the Epic that you closed as the source. Its Question asks whether to make the edits to `AGENTS.md` that you propose. Its body lists each finding that appeared in two or more FAIL verdicts of the tasks of this epic, and the edit to `AGENTS.md` that would stop each one. A finding that appeared once is not listed.
 
-### 8. Go to step 2
+### 8. Sweep Triage before you stop
+
+Do this each time `ready` is empty and nothing is in progress.
+
+1. Give each loose issue of the milestone a parent. List the open issues of the milestone in each repository of the project (`repos` of its `[[project]]` block in `taskrock.toml`), with their types, and read the parent of each:
+
+```sh
+gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number,title,issueType --jq '.[] | "\(.number) \(.issueType.name) \(.title)"'
+gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
+```
+
+   Only an issue of type Task, Bug or Feature gets a parent here. Skip every Initiative and Epic: an Initiative is the top of a plan and has no parent, and an Epic gets its parent when it is planned. The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Give such a Task, Bug or Feature a parent now. The parent follows "Where a filed issue goes" below, with the loose issue as the source.
+
+```sh
+gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
+```
+
+2. List the Triage items under the link:
+
+```sh
+taskrock ready <link> --json
+```
+
+   The key `triage` lists them, each with its number, title, url and type.
+3. Load the skill `taskrock-triage` with each item that you did not triage in this run. Keep the list of the items that it left as Needs information: you triage an item once in a run.
+4. Then go to step 2: what became Todo is ready, and you build it.
+
+### 9. Go to step 2
 
 ### When the review fails
 
@@ -218,17 +257,42 @@ Stop the rounds when the task has `review.max_rounds` FAIL verdicts, when the re
 taskrock release <task link> --note <file>
 ```
 
-3. File a task for the owner with "File an issue" below, with the parent of the task as its parent. Make it block the task.
+3. File a task for the owner with "File an issue" below, with the task as the source of "Where a filed issue goes" below. Make it block the task.
+
+### Where a filed issue goes
+
+Every issue that you file has a source: the task it comes from, the Epic that you closed for the retro, or the loose issue of step 8. The same two rules give its `parent` and its milestone everywhere.
+
+**Parent rule.** The `parent` of an issue that you file is an issue under the goal, never a project. Take the first of these that is the goal link or lies under it:
+
+1. The Epic of the source: its nearest ancestor of type Epic.
+2. The parent of the source.
+3. The goal link, when it is an issue.
+4. For a project link, when nothing nearer exists: the Initiative that holds the other open issues of the milestone. When there is more than one such Initiative, print the issues, do not say that the work is done, and stop.
+
+Read the parent of an issue, and its type, with:
+
+```sh
+gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
+gh issue view <parent link> --json issueType --jq .issueType.name
+```
+
+**Milestone rule.** The milestone of an issue that you file is the milestone of its source. Never read the milestone of a project link. When the source has none, stop, tell the user that it needs one, and file nothing:
+
+```sh
+gh issue view <source link> --json milestone --jq .milestone.title
+```
 
 ### File an issue
 
-Use this for a task for the owner, a Bug, and the retro. Every issue is made with `taskrock apply`.
+Use this for a task for the owner, a Bug, a follow-up task and the retro. Every issue is made with `taskrock apply`. It always has a parent and a milestone from "Where a filed issue goes".
 
 1. Print the empty body of the type. Use `owner` for a task for the owner:
 
 ```sh
 taskrock template owner --owner <owner>
 taskrock template Bug --owner <owner>
+taskrock template Task --owner <owner>
 ```
 
 2. Make a new folder outside the repository. Write `plan.toml` in it. The `id` is new for each filing, for example `goal-<task number>-<what>`:
@@ -237,9 +301,10 @@ taskrock template Bug --owner <owner>
 id = "goal-12-decision"
 repo = "<owner>/<repo>"
 project = "https://github.com/orgs/<owner>/projects/<number>"
+milestone = "<title of the milestone>"
 ```
 
-   The `project` is the delivery project that `taskrock ready` read.
+   The `project` is the delivery project that `taskrock ready` read. The `milestone` is the one that the milestone rule gives.
 
 3. Write one file, `<key>.md`, with the front matter and then the body from step 1, every section filled in. A task for the owner:
 
@@ -248,11 +313,12 @@ project = "https://github.com/orgs/<owner>/projects/<number>"
 key = "O1"
 title = "<what the owner must decide or do>"
 type = "Task"
+parent = "<link of the parent>"
 agent = "Owner"
 +++
 ```
 
-A Bug has `type = "Bug"` and no routing key. Its `## How to reproduce` is the command of the reviewer and its failing output.
+The `parent` is the link that the parent rule gives. A Bug has `type = "Bug"`, the same `parent`, and no routing key. Its `## How to reproduce` is the command of the reviewer and its failing output. A follow-up task has `type = "Task"`, the same `parent`, and the routing keys that `taskrock-plan` writes.
 
 4. Check and create it:
 
@@ -263,12 +329,15 @@ taskrock apply <folder>
 
 `apply` prints `created #<number> <key> <title>`. A Bug is created in Triage.
 
-5. Attach it, when the case needs it. As a child of a parent, and as a blocker of a task:
+5. Check the parent and the milestone, and attach a blocker when the case needs it:
 
 ```sh
-gh issue edit <new number> --repo <owner>/<repo> --parent <parent number>
+gh api repos/<owner>/<repo>/issues/<new number>/parent --jq .html_url
+gh issue view <new number> --repo <owner>/<repo> --json milestone --jq .milestone.title
 gh issue edit <task number> --repo <owner>/<repo> --add-blocked-by <new number>
 ```
+
+When the parent is missing, run `gh issue edit <new number> --repo <owner>/<repo> --parent <parent number>`. When the milestone is missing, run `gh issue edit <new number> --repo <owner>/<repo> --milestone "<title>"`.
 
 ### When a builder says the task is wrong
 
@@ -293,8 +362,33 @@ gh api rate_limit --jq '.resources.core.reset'
 
 Stop in one of these states:
 
-- `ready` is empty, nothing is in progress, and every issue under the link is closed: say that the work is done.
+- Done. All of these are true, and you checked each with its command:
+  - `ready` is empty and nothing is in progress.
+  - Step 8 finds no loose issue and no Triage item.
+  - No issue under the link is open, at any depth. Walk down from the link and list the sub-issues of every issue you meet, whatever its state: a closed parent can hold an open child. Open work is any `open` line:
+
+    ```sh
+    gh api repos/<owner>/<repo>/issues/<number>/sub_issues --paginate --jq '.[] | "\(.state) \(.html_url)"'
+    ```
+
+    For a project link, list its items instead, and confirm each item that is not Done with `gh issue view <url> --json state`:
+
+    ```sh
+    gh project item-list <number> --owner <owner> --format json --limit 500 --jq '.items[] | select(.status != "Done") | .content.url'
+    ```
+
+  - In each repository of the project, the milestone exists and has no open issue. The link itself carries the milestone, and step 7 has closed it by now. Run both commands for each milestone title and each repository:
+
+    ```sh
+    gh api "repos/<owner>/<repo>/milestones?state=all" --paginate --jq '.[].title'
+    gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number --jq length
+    ```
+
+    The first command must list the title. When it does not, the check fails: a repository without the milestone proves nothing, because its count is 0 for any title. Print the repository and the title, say that the milestone is missing (`taskrock setup <owner>` creates the shared milestones), do not say that the work is done, and stop. The second command must print `0`.
+
+  An open issue that a check finds is work: attach it under the link, triage or build it, and go to step 2. Only then say that the work is done.
 - `ready` is empty, nothing is in progress, and the only open tasks wait on the owner: print the `waiting_on_owner` list and stop.
+- `ready` is empty, nothing is in progress, and the only Triage items under the link are the ones that `taskrock-triage` left as Needs information: print each link with its `Still needed` list, say that the reporter must answer, and stop.
 - `ready` is empty, and the only tasks in progress have a pull request that waits for a reviewer that could not run: print each pull request and the reason, and stop.
 
 ## Completion checks
@@ -307,6 +401,10 @@ Make sure that each item is true:
 - You stopped a task after `review.max_rounds` FAIL verdicts and handed it to the user with a note.
 - You added a line to `## Decisions so far` of the parent of each merged task.
 - You wrote the retro task when you closed an Epic.
+- Each issue that you filed has a parent under the link and the milestone.
+- You ran the Triage sweep of step 8 and built each item that became Todo before you stopped.
+- You said the work is done only after the walk found no open issue, each repository listed the milestone, and each count printed `0`.
+- You triaged each Triage item once, and stopped with the list of the items that wait for their reporter.
 - You closed a parent only after the sub-issue count printed `0`.
 - You released each task whose pull request closed without a merge.
 - You told the user about each problem that you could not fix.

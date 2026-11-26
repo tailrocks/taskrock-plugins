@@ -198,14 +198,14 @@ When the parent that you closed is an Epic, write the retro. File a task for the
 
 Do this each time `ready` is empty and nothing is in progress.
 
-1. Give each loose issue of the milestone a parent. List the open issues of the milestone in each repository of the project (`repos` of its `[[project]]` block in `taskrock.toml`), and read the parent of each:
+1. Give each loose issue of the milestone a parent. List the open issues of the milestone in each repository of the project (`repos` of its `[[project]]` block in `taskrock.toml`), with their types, and read the parent of each:
 
 ```sh
-gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number,title
+gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number,title,issueType --jq '.[] | "\(.number) \(.issueType.name) \(.title)"'
 gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 ```
 
-   The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Give such an issue, except the link itself, a parent now. The parent follows "Where a filed issue goes" below, with the loose issue as the source.
+   Only an issue of type Task, Bug or Feature gets a parent here. Skip every Initiative and Epic: an Initiative is the top of a plan and has no parent, and an Epic gets its parent when it is planned. The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Give such a Task, Bug or Feature a parent now. The parent follows "Where a filed issue goes" below, with the loose issue as the source.
 
 ```sh
 gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
@@ -267,7 +267,7 @@ Every issue that you file has a source: the task it comes from, the Epic that yo
 
 1. The Epic of the source: its nearest ancestor of type Epic.
 2. The parent of the source.
-3. The goal link, when it is an Epic or an Initiative.
+3. The goal link, when it is an issue.
 4. For a project link, when nothing nearer exists: the Initiative that holds the other open issues of the milestone. When there is more than one such Initiative, print the issues, do not say that the work is done, and stop.
 
 Read the parent of an issue, and its type, with:

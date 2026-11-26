@@ -75,15 +75,20 @@ command -v claude codex agy muse grok
 
 Each name that prints a path is a runtime this machine can run. Offer only those runtimes. If the current config names another runtime, say so and ask whether to keep it.
 
-Offer only the models that each CLI reports:
+Offer only the models that a signed-in CLI reports. Each CLI shows its models in its own way, and each shows sign-in in its own way:
 
 ```sh
-codex debug models
+codex login status
+codex debug models | jq -r '.models[] | select(.visibility == "list") | .slug'
 agy models
 grok models
 ```
 
-`claude` and `muse` have no command that lists models. A CLI that is not signed in lists none either. For each of these, offer only the models that the Model field of the organization already holds, from step 2, and the models of the current config that name that runtime.
+- `codex`: it is signed in when `codex login status` exits with 0. It prints `Not logged in` and exits with 1 when it is not. The `jq` filter keeps only the models that the CLI lists and drops the hidden ones. Never print the raw output of `codex debug models`: it is one line of about 900 KB.
+- `agy`: `agy models` prints one model for each line, after the line `Fetching available models...`. It has no sign-in command, so offer the models that it prints.
+- `grok`: `grok models` exits with 0 even when it is not signed in. It then prints the line `You are not authenticated.` before the list. Offer its models only when that line is absent.
+
+`claude` and `muse` have no command that lists models. For these two, and for a CLI that is not signed in, offer only the models that the Model field of the organization already holds, from step 2, and the models of the current config that name that runtime.
 
 ### 4. Interview in rounds
 

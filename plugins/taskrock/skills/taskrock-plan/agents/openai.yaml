@@ -1,0 +1,6 @@
+interface:
+  display_name: "Taskrock: Plan"
+  short_description: "Turn the discussed work into a plan on GitHub"
+  default_prompt: "Use $taskrock-plan to plan the work we discussed on GitHub."
+policy:
+  allow_implicit_invocation: true

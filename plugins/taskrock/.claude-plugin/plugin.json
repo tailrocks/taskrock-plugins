@@ -1,0 +1,20 @@
+{
+  "name": "taskrock",
+  "version": "0.1.0",
+  "description": "Plan work on GitHub, build one planned issue, and manage a whole goal through review and merge with the taskrock command-line tool.",
+  "author": {
+    "name": "tailrocks",
+    "url": "https://github.com/tailrocks"
+  },
+  "homepage": "https://github.com/tailrocks/taskrock-plugins",
+  "repository": "https://github.com/tailrocks/taskrock-plugins",
+  "license": "Apache-2.0",
+  "keywords": [
+    "taskrock",
+    "github",
+    "planning",
+    "issues",
+    "pull-requests",
+    "projects"
+  ]
+}

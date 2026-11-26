@@ -1,0 +1,16 @@
+{
+  "name": "taskrock",
+  "owner": {
+    "name": "tailrocks",
+    "url": "https://github.com/tailrocks"
+  },
+  "description": "The taskrock plugin: plan, build and manage work on GitHub.",
+  "plugins": [
+    {
+      "name": "taskrock",
+      "source": "./plugins/taskrock",
+      "description": "Plan work on GitHub, build one planned issue, and manage a whole goal through review and merge with the taskrock command-line tool.",
+      "version": "0.1.0"
+    }
+  ]
+}

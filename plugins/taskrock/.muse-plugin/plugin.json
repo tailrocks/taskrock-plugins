@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "name": "taskrock",
+  "version": "0.1.0",
+  "description": "Plan work on GitHub, build one planned issue, and manage a whole goal through review and merge with the taskrock command-line tool.",
+  "displayName": "taskrock",
+  "compat": {
+    "source": "native",
+    "manifestDir": ".muse-plugin"
+  },
+  "capabilities": {
+    "skills": [
+      {
+        "id": "taskrock-goal",
+        "path": "skills/taskrock-goal/SKILL.md",
+        "enabledDefault": true
+      },
+      {
+        "id": "taskrock-issue",
+        "path": "skills/taskrock-issue/SKILL.md",
+        "enabledDefault": true
+      },
+      {
+        "id": "taskrock-plan",
+        "path": "skills/taskrock-plan/SKILL.md",
+        "enabledDefault": true
+      }
+    ],
+    "commands": [],
+    "hooks": []
+  }
+}

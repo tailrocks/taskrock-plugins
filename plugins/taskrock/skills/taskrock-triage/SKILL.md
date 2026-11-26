@@ -1,7 +1,7 @@
 ---
 name: taskrock-triage
 description: >-
-  Triage a Bug or Feature whose status is Triage: check it, reproduce it, then make it ready (Todo) or close it with a reason. Use when the user asks to triage, or gives the link of an issue in Triage.
+  Triage a Bug or Feature whose status is Triage: check it, reproduce it, then make it ready (Todo) or close it with a reason. Use when the user asks to triage, or gives the link of an issue in Triage. Call it with /taskrock:taskrock-triage (Claude Code), $taskrock:taskrock-triage (Codex), /taskrock-triage (Grok Build, Muse Code, Antigravity), or "use the skill taskrock-triage".
 license: Apache-2.0
 ---
 
@@ -176,20 +176,14 @@ gh project item-edit --project-id <project id> --id <item id> --field-id <Status
 taskrock ready <project link>
 ```
 
-A Feature that is too big for one task gets sub-issues instead of Steps. Make a folder outside the repository with `plan.toml` (a new `id`, plus `repo` and `project`) and one file for each sub-issue, with no `parent` key. Write each sub-issue as `taskrock-plan` does. The folder holds the sub-issues only, never the Feature. Then:
+A Feature that is too big for one task gets sub-issues instead of Steps. Make a folder outside the repository with `plan.toml` (a new `id`, plus `repo` and `project`) (add `milestone = "<title>"` when the Feature has a milestone: `gh issue view <link> --json milestone --jq .milestone.title`) and one file for each sub-issue, each with `parent = "<link of the Feature>"`. Write each sub-issue as `taskrock-plan` does. The folder holds the sub-issues only, never the Feature. Then:
 
 ```sh
 taskrock check <folder>
 taskrock apply <folder>
 ```
 
-`apply` prints `created #<number> <key> <title>` for each sub-issue. Attach each one to the Feature:
-
-```sh
-gh issue edit <sub-issue number> --repo <owner>/<repo> --parent <link of the Feature>
-```
-
-Delete the folder. The Feature is now a parent: set its Status to Todo as in item 5. Do not set its routing fields.
+`apply` prints `created #<number> <key> <title>` for each sub-issue, under the Feature. Delete the folder. The Feature is now a parent: set its Status to Todo as in item 5. Do not set its routing fields.
 
 #### Needs information
 
@@ -225,7 +219,7 @@ Do step 4 and step 5 for the next issue of step 3. When the list is empty, stop.
 
 Print one line for each issue: its link, and Ready, Needs information or Rejected with the reason in a few words.
 
-Then give the next step for each Ready issue, and name the skill: in Claude Code `/taskrock:taskrock-issue <link>`, in the other agents "use the skill taskrock-issue with <link>". For a Feature that you split into sub-issues, name `taskrock-goal` the same way: `/taskrock:taskrock-goal <link>` or "use the skill taskrock-goal with <link>".
+Then give the next step for each Ready issue, and name the skill with the call of each agent. For `taskrock-issue`: Claude Code `/taskrock:taskrock-issue <link>`, Codex `$taskrock:taskrock-issue <link>`, Grok Build, Muse Code and Antigravity `/taskrock-issue <link>`, any agent "use the skill taskrock-issue with <link>". For a Feature that you split into sub-issues, use `taskrock-goal` with the same four calls (`/goal /taskrock:taskrock-goal <link>` in Claude Code for a long build).
 
 ## Completion checks
 

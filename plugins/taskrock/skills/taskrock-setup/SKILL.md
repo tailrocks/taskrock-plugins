@@ -1,7 +1,7 @@
 ---
 name: taskrock-setup
 description: >-
-  Interview the owner, write <owner>/.github/taskrock.toml and run taskrock setup so GitHub matches it. Use when the user asks to set up an organization or change its taskrock config.
+  Interview the owner, write <owner>/.github/taskrock.toml and run taskrock setup so GitHub matches it. Use when the user asks to set up an organization or change its taskrock config. Call it with /taskrock:taskrock-setup (Claude Code), $taskrock:taskrock-setup (Codex), /taskrock-setup (Grok Build, Muse Code, Antigravity), or "use the skill taskrock-setup".
 license: Apache-2.0
 ---
 
@@ -253,7 +253,7 @@ taskrock setup <owner> --yes
 
 ## Result
 
-Print the link of the pull request and the last output of `taskrock setup <owner> --dry-run`. Delete the draft folder. Then give the next step and name the skill: to plan work, in Claude Code `/taskrock:taskrock-plan`, in the other agents "use the skill taskrock-plan".
+Print the link of the pull request and the last output of `taskrock setup <owner> --dry-run`. Delete the draft folder. Then give the next step and name the skill: to plan work, Claude Code `/taskrock:taskrock-plan`, Codex `$taskrock:taskrock-plan`, Grok Build, Muse Code and Antigravity `/taskrock-plan`, any agent "use the skill taskrock-plan".
 
 ## Completion checks
 

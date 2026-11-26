@@ -1,7 +1,7 @@
 ---
 name: taskrock-issue
 description: >-
-  Build exactly one GitHub issue of type Task, Bug or Feature that has no sub-issues, and open its pull request. Use when the user says use the skill taskrock-issue with <link>, types /taskrock:taskrock-issue <link> in Claude Code, or a manager hands you one task. If the link is a project, an Initiative, an Epic or any issue with sub-issues, use taskrock-goal instead.
+  Build exactly one GitHub issue of type Task, Bug or Feature that has no sub-issues, and open its pull request. Call it with /taskrock:taskrock-issue <link> (Claude Code), $taskrock:taskrock-issue <link> (Codex), /taskrock-issue <link> (Grok Build, Muse Code, Antigravity), or "use the skill taskrock-issue with <link>". If the link is a project, an Initiative, an Epic or any issue with sub-issues, use taskrock-goal instead.
 license: Apache-2.0
 ---
 
@@ -77,7 +77,7 @@ taskrock claim <link>
 ```
 
 - Exit status 0: the task is yours. Its branch `feat/issue-<number>` exists on GitHub.
-- Exit status 3: the answer is no. Another agent has it, or it is not ready. Stop and say so.
+- Exit status 3: the answer is no. Another agent has it, its status is not Todo, or a blocker is still open. Stop and say so.
 
 ### 4. Switch to the branch
 
@@ -179,7 +179,7 @@ gh issue view <link> --json milestone --jq .milestone.title
 milestone = "<title of the milestone of your task>"
 ```
 
-When your task has no parent or no milestone, leave out that line. The keys `parent` as a link and `milestone` in `plan.toml` need taskrock 0.2.1.
+When your task has no parent or no milestone, leave out that line.
 
 ```sh
 taskrock apply <folder>

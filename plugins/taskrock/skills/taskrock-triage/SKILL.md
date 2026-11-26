@@ -225,6 +225,8 @@ Do step 4 and step 5 for the next issue of step 3. When the list is empty, stop.
 
 Print one line for each issue: its link, and Ready, Needs information or Rejected with the reason in a few words.
 
+Then give the next step for each Ready issue, and name the skill: in Claude Code `/taskrock:taskrock-issue <link>`, in the other agents "use the skill taskrock-issue with <link>". For a Feature that you split into sub-issues, name `taskrock-goal` the same way: `/taskrock:taskrock-goal <link>` or "use the skill taskrock-goal with <link>".
+
 ## Completion checks
 
 Make sure that each item is true:
@@ -235,3 +237,4 @@ Make sure that each item is true:
 - Every comment you posted starts with `_Written by an agent._`.
 - You changed an issue body only with `taskrock edit`, and created sub-issues only with `taskrock apply`.
 - You did not build the issue.
+- The next step of each Ready issue names the skill `taskrock-issue` or `taskrock-goal`.

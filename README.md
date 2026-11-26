@@ -7,6 +7,8 @@ The plugin `taskrock` for five agent CLIs: Claude Code, Codex, Grok Build, Muse 
 | `taskrock-plan` | Turn the work you explained into an initiative, epics and tasks on GitHub |
 | `taskrock-issue` | Build one planned issue and open its pull request |
 | `taskrock-goal` | Build, review and merge everything under an initiative, epic or project |
+| `taskrock-triage` | Check a reported Bug or Feature and make it ready to build, or close it with the reason |
+| `taskrock-setup` | Write the organization's taskrock.toml and make GitHub match it |
 
 ## Requirements
 

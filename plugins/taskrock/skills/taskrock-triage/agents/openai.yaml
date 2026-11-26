@@ -1,0 +1,6 @@
+interface:
+  display_name: "Taskrock: Triage"
+  short_description: "Check a reported Bug or Feature in Triage, then make it ready or close it"
+  default_prompt: "Use $taskrock-triage on this issue link or project link."
+policy:
+  allow_implicit_invocation: true

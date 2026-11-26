@@ -24,6 +24,11 @@
         "id": "taskrock-plan",
         "path": "skills/taskrock-plan/SKILL.md",
         "enabledDefault": true
+      },
+      {
+        "id": "taskrock-triage",
+        "path": "skills/taskrock-triage/SKILL.md",
+        "enabledDefault": true
       }
     ],
     "commands": [],

@@ -31,7 +31,7 @@ Use this skill when the user gives you the link of one issue of type Task, Bug o
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.2.1, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
+This skill needs the `taskrock` command-line tool, version 0.3.0, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
 The input is one issue link. The issue holds the Steps, the Done when list, and the Out of scope list.
 
 This skill changes GitHub. Step 3 takes the task for you. Step 5 pushes commits to the task branch. Step 8 opens a pull request.
@@ -45,7 +45,7 @@ The skill never merges. The manager merges.
 taskrock --version
 ```
 
-It must print `taskrock 0.2.1` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.2.1 or newer. Do not go on.
+It must print `taskrock 0.3.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.3.0 or newer. Do not go on.
 
 ### 1. Route
 

@@ -1,6 +1,6 @@
 # Installation
 
-The plugin `taskrock` installs on five agent CLIs. Each one needs `taskrock` 0.2.1 or newer on `PATH`, and `gh` signed in to GitHub. Every skill checks the `taskrock` version first and stops if it is missing or too old.
+The plugin `taskrock` installs on five agent CLIs. Each one needs `taskrock` 0.3.0 or newer on `PATH`, and `gh` signed in to GitHub. Every skill checks the `taskrock` version first and stops if it is missing or too old.
 
 The commands below were run on 2026-11-26 with the versions in the table. Each agent then listed the three skills `taskrock-plan`, `taskrock-issue` and `taskrock-goal`.
 

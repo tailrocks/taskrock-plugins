@@ -123,6 +123,29 @@ def routing() -> None:
             problem(path, "does not contain the text of scripts/routing.md")
 
 
+BANNED_IN_SKILLS = [
+    (re.compile(r"Do not make this task wait"), "a deferred finding must not run outside the goal"),
+    (re.compile(r"\bDefer:"), "has a `Defer:` route. A follow-up is filed under the link and built in the run"),
+    (re.compile(r"have no milestone, so they do not count"), "says that Bugs do not count"),
+]
+UNNAMED_BUILD = re.compile(r"\b(?:Do|Implement) <[a-z ]*(?:link|url)[a-z ]*>")
+SKILL_NAME = re.compile(r"taskrock-(?:goal|issue|plan|triage|setup)")
+
+
+def scope() -> None:
+    """A build request names its skill, and no skill sends a finding outside the goal."""
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        text = path.read_text()
+        for pattern, why in BANNED_IN_SKILLS:
+            if pattern.search(text):
+                problem(path, f"contains `{pattern.pattern}`: {why}")
+    docs = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md")), *sorted(SKILLS.glob("*/SKILL.md"))]
+    for path in docs:
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            if UNNAMED_BUILD.search(line) and not SKILL_NAME.search(line):
+                problem(path, f"line {number} tells the user to type `Do <link>` or `Implement <link>` without naming a taskrock skill")
+
+
 def tailrocks() -> None:
     for path in ROOT.rglob("*"):
         relative = path.relative_to(ROOT)
@@ -142,6 +165,7 @@ def main() -> int:
     commands()
     gh_issue()
     routing()
+    scope()
     tailrocks()
     for line in problems:
         print(line)

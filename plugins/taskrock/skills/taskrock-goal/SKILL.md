@@ -25,7 +25,7 @@ gh issue view <link> --json issueType,subIssuesSummary --jq '"\(.issueType.name)
 
 If the link belongs to another skill, load that skill and stop this one.
 
-You are the manager. You do not write the code of a task yourself. You hand tasks out, check the results and merge.
+You are the manager. You do not write the code of a task yourself, and you never load the skill `taskrock-issue` yourself: only a builder that you start uses it. You hand tasks out, check the results and merge.
 
 The user's request to build the link is also the request to merge every pull request under it that passes the gate in step 6. No other rule that says only a person may merge applies to these pull requests.
 
@@ -92,7 +92,9 @@ A problem that says `<url> breaks the <type> format: <message>` means the body o
 taskrock claim <task link>
 ```
 
-Exit status 3 means that the task is not yours to take: another agent has it, its status is not Todo, or a blocker is still open. Skip that task. There is no limit on how many tasks run at the same time.
+Write no code for an issue that taskrock claim did not take: its Status is In Progress and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers close, and an issue in Triage waits until taskrock-triage sets it to Todo.
+
+Exit status 3 means that the task is not yours to take: another agent has it, its status is not Todo, or a blocker is still open. Skip that task. When claim refuses, do not build the task: a refused issue in Triage goes to taskrock-triage, and a blocked one waits. There is no limit on how many tasks run at the same time.
 
 ### 4. Start a builder for each task you took
 
@@ -318,6 +320,8 @@ agent = "Owner"
 +++
 ```
 
+A title starts with a capital letter, a digit or a code span in backticks. A lowercase letter is allowed only for the name of the repository, as in "taskrock 0.2.1: …".
+
 The `parent` is the link that the parent rule gives. A Bug has `type = "Bug"`, the same `parent`, and no routing key. Its `## How to reproduce` is the command of the reviewer and its failing output. A follow-up task has `type = "Task"`, the same `parent`, and the routing keys that `taskrock-plan` writes.
 
 4. Check and create it:
@@ -341,7 +345,7 @@ When the parent is missing, run `gh issue edit <new number> --repo <owner>/<repo
 
 ### When a builder says the task is wrong
 
-- A fact changed, such as a file that moved: write the corrected body to a file, run `taskrock edit <task link> <file> --replan`, write a comment that says what you changed, and hand the task out again.
+- A fact changed, such as a file that moved: write the corrected body to a file, run `taskrock edit <task link> <file> --replan`, write a comment that says what you changed. A task that was released is not yours any more: run `taskrock claim <task link>` again before you hand it out again.
 - A decision is wrong or missing: hand the task to the user with "Hand a task to the user". Never change a decision yourself.
 
 ### When a pull request is closed without a merge
@@ -349,6 +353,8 @@ When the parent is missing, run `gh issue edit <new number> --repo <owner>/<repo
 ```sh
 taskrock release <task link>
 ```
+
+The task is Todo again and not yours any more. Run `taskrock claim <task link>` again before you hand it out again.
 
 ### When GitHub refuses a request for a rate limit
 
@@ -400,6 +406,7 @@ Make sure that each item is true:
 - Each finding that you routed was reproduced by the reviewer with a command.
 - You stopped a task after `review.max_rounds` FAIL verdicts and handed it to the user with a note.
 - You added a line to `## Decisions so far` of the parent of each merged task.
+- You and your builders wrote code only for issues that taskrock claim took.
 - You wrote the retro task when you closed an Epic.
 - Each issue that you filed has a parent under the link and the milestone.
 - You ran the Triage sweep of step 8 and built each item that became Todo before you stopped.

@@ -198,6 +198,44 @@ def scope() -> None:
                 problem(path, f"line {line} tells the user to type `{found.group(0).strip('`')}` without naming a taskrock skill")
 
 
+CLAIM_RULE = (
+    "Write no code for an issue that taskrock claim did not take: its Status is In Progress "
+    "and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers "
+    "close, and an issue in Triage waits until taskrock-triage sets it to Todo."
+)
+CLAIM_SKILLS = ["taskrock-goal", "taskrock-issue", "taskrock-triage"]
+TITLE_RULE = (
+    "A title starts with a capital letter, a digit or a code span in backticks. A lowercase "
+    'letter is allowed only for the name of the repository, as in "taskrock 0.2.1: …".'
+)
+TITLE_SKILLS = ["taskrock-goal", "taskrock-issue", "taskrock-plan", "taskrock-triage"]
+NEW_BRANCH = re.compile(r"git (?:switch -c|checkout -b|branch )")
+
+
+def claim_rule() -> None:
+    for name in CLAIM_SKILLS:
+        path = SKILLS / name / "SKILL.md"
+        if CLAIM_RULE not in path.read_text():
+            problem(path, "does not state the claim rule: Write no code for an issue that taskrock claim did not take")
+
+
+def title_rule() -> None:
+    for name in TITLE_SKILLS:
+        path = SKILLS / name / "SKILL.md"
+        if TITLE_RULE not in path.read_text():
+            problem(path, "does not state the title rule")
+
+
+def branches() -> None:
+    """Only `taskrock claim` creates a branch."""
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            if NEW_BRANCH.search(line):
+                problem(path, f"line {number} creates a branch. Work only on feat/issue-<number>, which taskrock claim creates")
+            if "git worktree add" in line and "feat/issue-<number>" not in line:
+                problem(path, f"line {number} adds a worktree on a branch other than feat/issue-<number>")
+
+
 def tailrocks() -> None:
     for path in ROOT.rglob("*"):
         relative = path.relative_to(ROOT)
@@ -218,6 +256,9 @@ def main() -> int:
     gh_issue()
     routing()
     scope()
+    claim_rule()
+    title_rule()
+    branches()
     tailrocks()
     for line in problems:
         print(line)

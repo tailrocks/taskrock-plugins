@@ -192,7 +192,7 @@ gh issue close <parent link>
 
 Close the parent only when the first command prints `0`.
 
-When the parent that you closed is an Epic, write the retro. File a task for the owner with "File an issue" below. Its `parent` is the link of the goal, and when the link is an Epic, that Epic. It has the milestone of the goal link, so it stays inside the link. Its Question asks whether to make the edits to `AGENTS.md` that you propose. Its body lists each finding that appeared in two or more FAIL verdicts of the tasks of this epic, and the edit to `AGENTS.md` that would stop each one. A finding that appeared once is not listed.
+When the parent that you closed is an Epic, write the retro. File a task for the owner with "File an issue" below. Its `parent` is the link of the goal, and when the link is an Epic, that Epic. When the link is a project link, which cannot be a parent, its `parent` is the Initiative that holds the Epic (the parent of the Epic). Its milestone is the milestone of the goal link, and for a project link the milestone of the Epic. So it stays inside the link. Its Question asks whether to make the edits to `AGENTS.md` that you propose. Its body lists each finding that appeared in two or more FAIL verdicts of the tasks of this epic, and the edit to `AGENTS.md` that would stop each one. A finding that appeared once is not listed.
 
 ### 8. Sweep Triage before you stop
 
@@ -280,14 +280,15 @@ project = "https://github.com/orgs/<owner>/projects/<number>"
 milestone = "<title of the milestone>"
 ```
 
-   The `project` is the delivery project that `taskrock ready` read. The milestone is the milestone of the task that the issue comes from. An issue that comes from the goal itself, such as the retro, gets the milestone of the goal link:
+   The `project` is the delivery project that `taskrock ready` read. The milestone is the milestone of the task that the issue comes from. An issue that comes from the goal itself, such as the retro, gets the milestone of the goal link, and for a project link the milestone of the Epic that the retro is about:
 
 ```sh
 gh issue view <task link> --json milestone --jq .milestone.title
 gh issue view <goal link> --json milestone --jq .milestone.title
+gh issue view <epic link> --json milestone --jq .milestone.title
 ```
 
-   Use the first command for an issue that comes from a task, and the second for an issue that comes from the goal. When the command prints nothing, stop and tell the user that the task or the goal needs a milestone. File nothing without one.
+   Use the first command for an issue that comes from a task, the second for an issue that comes from the goal, and the third for the retro of a project link. When the command prints nothing, stop and tell the user that the task, the goal or the Epic needs a milestone. File nothing without one.
 
 3. Write one file, `<key>.md`, with the front matter and then the body from step 1, every section filled in. A task for the owner:
 

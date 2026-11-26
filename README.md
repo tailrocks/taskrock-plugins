@@ -34,7 +34,9 @@ Always name the skill, so the agent does not pick another one.
 | Agent | One task | A whole initiative, epic or project |
 | --- | --- | --- |
 | Claude Code | `/taskrock:taskrock-issue <link>` | `/taskrock:taskrock-goal <link>`, or `/goal /taskrock:taskrock-goal <link>` |
-| Codex, Grok Build, Muse Code, Antigravity | "use the skill taskrock-issue with `<link>`" | "use the skill taskrock-goal with `<link>`" |
+| Codex | `$taskrock:taskrock-issue <link>` | `$taskrock:taskrock-goal <link>` |
+| Grok Build, Muse Code, Antigravity | `/taskrock-issue <link>` | `/taskrock-goal <link>` |
+| Any agent | "use the skill taskrock-issue with `<link>`" | "use the skill taskrock-goal with `<link>`" |
 
 `taskrock-goal` does not stop while an issue under the link is open or a Bug waits in Triage under it.
 

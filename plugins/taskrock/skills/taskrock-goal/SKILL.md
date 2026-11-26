@@ -65,13 +65,13 @@ gh issue view <link> --json issueType,subIssuesSummary --jq '"\(.issueType.name)
 
 If the table sends this link to another skill, load that skill and stop this one.
 
-Find the milestone of the goal. An issue link has one or none:
+Find the milestone of the goal. Every issue that you file needs one, so an issue link without a milestone is a stop:
 
 ```sh
-gh issue view <link> --json milestone --jq .milestone.title
+gh issue view <goal link> --json milestone --jq .milestone.title
 ```
 
-A project link has none. Keep the milestone titles of the tasks that you hand out: every milestone check below runs for each title. When the goal has no milestone, skip the milestone checks.
+When the command prints nothing, stop and tell the user that the goal needs a milestone. Do not hand out any task. A project link has no milestone of its own: keep the milestone titles of the tasks that you hand out, and every milestone check below runs for each title. A task without a milestone is also a stop: tell the user.
 
 ### 2. Ask what is ready
 
@@ -192,7 +192,7 @@ gh issue close <parent link>
 
 Close the parent only when the first command prints `0`.
 
-When the parent that you closed is an Epic, write the retro. File a task for the owner with "File an issue" below, under the initiative that holds the epic (the parent of the epic). Its Question asks whether to make the edits to `AGENTS.md` that you propose. Its body lists each finding that appeared in two or more FAIL verdicts of the tasks of this epic, and the edit to `AGENTS.md` that would stop each one. A finding that appeared once is not listed.
+When the parent that you closed is an Epic, write the retro. File a task for the owner with "File an issue" below. Its `parent` is the link of the goal, and when the link is an Epic, that Epic. It has the milestone of the goal link, so it stays inside the link. Its Question asks whether to make the edits to `AGENTS.md` that you propose. Its body lists each finding that appeared in two or more FAIL verdicts of the tasks of this epic, and the edit to `AGENTS.md` that would stop each one. A finding that appeared once is not listed.
 
 ### 8. Sweep Triage before you stop
 
@@ -205,7 +205,7 @@ gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json nu
 gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 ```
 
-   The second command fails with `Not Found` when the issue has no parent. Give such an issue, except the link itself, a parent now. The parent is the link of the goal. For a project link it is the Initiative that holds the other issues of the milestone. When there is more than one such Initiative, print the loose issues, do not say that the work is done, and stop.
+   The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Give such an issue, except the link itself, a parent now. The parent is the link of the goal. For a project link it is the Initiative that holds the other issues of the milestone. When there is more than one such Initiative, print the loose issues, do not say that the work is done, and stop.
 
 ```sh
 gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
@@ -284,9 +284,10 @@ milestone = "<title of the milestone>"
 
 ```sh
 gh issue view <task link> --json milestone --jq .milestone.title
+gh issue view <goal link> --json milestone --jq .milestone.title
 ```
 
-   When that command prints nothing, leave the `milestone` line out.
+   Use the first command for an issue that comes from a task, and the second for an issue that comes from the goal. When the command prints nothing, stop and tell the user that the task or the goal needs a milestone. File nothing without one.
 
 3. Write one file, `<key>.md`, with the front matter and then the body from step 1, every section filled in. A task for the owner:
 
@@ -359,7 +360,7 @@ Stop in one of these states:
     gh project item-list <number> --owner <owner> --format json --limit 500 --jq '.items[] | select(.status != "Done") | .content.url'
     ```
 
-  - In each repository of the project, the milestone exists and has no open issue. Run both commands for each milestone title and each repository:
+  - In each repository of the project, the milestone exists and has no open issue. The link itself carries the milestone, and step 7 has closed it by now. Run both commands for each milestone title and each repository:
 
     ```sh
     gh api "repos/<owner>/<repo>/milestones?state=all" --paginate --jq '.[].title'

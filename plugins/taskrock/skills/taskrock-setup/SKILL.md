@@ -253,7 +253,7 @@ taskrock setup <owner> --yes
 
 ## Result
 
-Print the link of the pull request and the last output of `taskrock setup <owner> --dry-run`. Delete the draft folder.
+Print the link of the pull request and the last output of `taskrock setup <owner> --dry-run`. Delete the draft folder. Then give the next step and name the skill: to plan work, in Claude Code `/taskrock:taskrock-plan`, in the other agents "use the skill taskrock-plan".
 
 ## Completion checks
 
@@ -267,3 +267,4 @@ Make sure that each item is true:
 - You ran `taskrock setup <owner>` only after the owner merged the pull request and approved.
 - You used `--yes` only after the owner agreed to delete a workflow.
 - The last `taskrock setup <owner> --dry-run` printed only `exists` lines and notes.
+- The next step names the skill `taskrock-plan`.

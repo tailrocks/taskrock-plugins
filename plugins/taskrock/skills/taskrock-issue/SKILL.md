@@ -1,7 +1,7 @@
 ---
 name: taskrock-issue
 description: >-
-  Build exactly one GitHub issue of type Task, Bug or Feature that has no sub-issues, and open its pull request. Use when the user says Do <link> or a manager hands you one task. If the link is a project, an Initiative, an Epic or any issue with sub-issues, use taskrock-goal instead.
+  Build exactly one GitHub issue of type Task, Bug or Feature that has no sub-issues, and open its pull request. Use when the user says use the skill taskrock-issue with <link>, types /taskrock:taskrock-issue <link> in Claude Code, or a manager hands you one task. If the link is a project, an Initiative, an Epic or any issue with sub-issues, use taskrock-goal instead.
 license: Apache-2.0
 ---
 
@@ -27,7 +27,7 @@ If the link belongs to another skill, load that skill and stop this one.
 
 You get one issue link. The issue is the whole task. Build only what it says.
 
-Use this skill when the user gives you the link of one issue of type Task, Bug or Feature that has no sub-issues. Use it also when a manager hands you one task.
+Use this skill when the user gives you the link of one issue of type Task, Bug or Feature that has no sub-issues. The user names it: "use the skill taskrock-issue with <link>", or `/taskrock:taskrock-issue <link>` in Claude Code. Use it also when a manager hands you one task.
 
 ## Before you start
 
@@ -168,13 +168,24 @@ mkdir <folder>
 taskrock template Bug > <folder>/B1.md
 ```
 
-Fill `<folder>/B1.md`. The front matter has `key`, `title` and `type = "Bug"`, and no routing key. Write every section of the template. Write a `<folder>/plan.toml` with the delivery project, in the format of `taskrock-plan`.
+Fill `<folder>/B1.md`. The front matter has `key`, `title`, `type = "Bug"` and `parent`, and no routing key. The `parent` is the link of the parent (the epic) of your task. Write every section of the template. Write a `<folder>/plan.toml` with the delivery project, in the format of `taskrock-plan`, and the milestone of your task:
+
+```sh
+gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
+gh issue view <link> --json milestone --jq .milestone.title
+```
+
+```toml
+milestone = "<title of the milestone of your task>"
+```
+
+When your task has no parent or no milestone, leave out that line. The keys `parent` as a link and `milestone` in `plan.toml` need taskrock 0.2.1.
 
 ```sh
 taskrock apply <folder>
 ```
 
-The Bug lands in Triage. Then go on with your task. Use a folder outside the repository.
+The Bug lands in Triage under the epic of your task, with its milestone. Then go on with your task. Use a folder outside the repository. Put the link of the Bug in your final report, above the last line.
 
 ## Result
 
@@ -194,5 +205,6 @@ Make sure that each item is true:
 - You merged the default branch into the task branch and ran every command under `Done when` again, and saw its result yourself.
 - The pull request body has the sections `Why`, `What`, `Proof`, and `Done when`, and the line `Closes #<number>`.
 - When you stopped before the pull request, the note has the sections `Done`, `Verified`, `State` and `Next step`, and `taskrock release <link> --note <file>` ran.
+- When you filed a friction Bug, it has the parent and the milestone of your task, and your report names its link.
 - The last line of your report is `DONE`, `BLOCKED` or `TASK_WRONG`, as described under "Result".
 - You did not merge the pull request.

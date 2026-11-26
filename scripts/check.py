@@ -267,6 +267,18 @@ def stacked_claims() -> None:
                     problem(path, "runs `taskrock claim --stacked`. Only the manager in taskrock-goal stacks a task")
 
 
+STACK_RULE = (
+    "Merge a pull request only when its base is the default branch, and retarget every open "
+    "pull request whose base is its branch to the default branch before you merge it."
+)
+
+
+def stack_rule() -> None:
+    path = SKILLS / "taskrock-goal" / "SKILL.md"
+    if STACK_RULE not in path.read_text():
+        problem(path, "does not state the stack rule: Merge a pull request only when its base is the default branch")
+
+
 def title_rule() -> None:
     for name in TITLE_SKILLS:
         path = SKILLS / name / "SKILL.md"
@@ -311,6 +323,7 @@ def main() -> int:
     scope()
     claim_rule()
     stacked_claims()
+    stack_rule()
     title_rule()
     branches()
     tailrocks()

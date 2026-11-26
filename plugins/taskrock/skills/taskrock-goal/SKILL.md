@@ -76,10 +76,10 @@ When the command prints nothing, stop and tell the user that the goal needs a mi
 ### 2. Ask what is ready
 
 ```sh
-taskrock ready <link> --json
+taskrock ready <link> --json --stacked
 ```
 
-`ready` lists the tasks to hand out, each with who builds and who reviews. `problems` lists what is wrong with the plan. Fix a problem you can fix. Tell the user about the others.
+`ready` lists the tasks to hand out, each with who builds and who reviews. An entry whose `stacked` is not `null` is a task whose open blockers are being built: `stacked.base` is the branch it starts from, and `stacked.pull_request` is the open pull request of that branch. `problems` lists what is wrong with the plan. Fix a problem you can fix. Tell the user about the others.
 
 A problem that says `<url> breaks the <type> format: <message>` means the body of that issue lacks a section:
 
@@ -90,15 +90,20 @@ A problem that says `<url> breaks the <type> format: <message>` means the body o
 
 ```sh
 taskrock claim <task link>
+taskrock claim <task link> --stacked
 ```
+
+Run the first line for a task whose `stacked` is `null`, and the second for any other. The second prints a third line, `base feat/issue-<base>`. Keep each stacked task with its base: step 4, step 6 and "When a pull request is closed without a merge" use it.
 
 Write no code for an issue that taskrock claim did not take: its Status is In Progress and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers close, or until the manager of taskrock-goal takes it with taskrock claim --stacked, and an issue in Triage waits until taskrock-triage sets it to Todo.
 
-Exit status 3 means that the task is not yours to take: another agent has it, its status is not Todo, or a blocker is still open. Skip that task. When claim refuses, do not build the task: a refused issue in Triage goes to taskrock-triage, and a blocked one waits. There is no limit on how many tasks run at the same time.
+Exit status 3 means that the task is not yours to take: another agent has it, its status is not Todo, or a blocker is still open, or, with `--stacked`, the stack changed. Run step 2 again before you try it again. Skip that task. When claim refuses, do not build the task: a refused issue in Triage goes to taskrock-triage, and a blocked one waits. There is no limit on how many tasks run at the same time.
 
 ### 4. Start a builder for each task you took
 
 The prompt of the builder names the skill, gives the link and says the task is taken: "use the skill taskrock-issue with <task link>. The task is already taken for you."
+
+For a stacked task, the prompt adds one sentence: "It is stacked on feat/issue-<base>."
 
 - The task's Runtime is the CLI you run in: start a helper inside your session, on the task's Model and Effort.
 - The task's Runtime is another CLI: start that CLI as a new session, in its own worktree of the repository.
@@ -158,16 +163,27 @@ You file nothing without a parent and a milestone. A finding is never parked in 
 
 ### 6. Merge only through this gate
 
-All three must be true:
+All four must be true:
 
 - Every check passed.
 - The newest verdict is `VERDICT: PASS head=<sha>`, and `<sha>` equals the head commit of the pull request.
 - The body of the pull request has `Closes #<number of the task>`.
+- The base of the pull request is the default branch: `gh pr view <pull request> --json baseRefName --jq .baseRefName` prints it. A stacked pull request waits until its base merged.
+
+Merge a pull request only when its base is the default branch, and retarget every open pull request whose base is its branch to the default branch before you merge it.
+
+```sh
+gh pr view <pull request> --json headRefName --jq .headRefName
+gh pr list --base <that branch> --state open --json number --jq '.[].number'
+gh pr edit <each number> --base <default branch>
+```
 
 ```sh
 gh pr view <pull request> --json headRefOid --jq .headRefOid
 gh pr merge <pull request> --squash --match-head-commit <that value>
 ```
+
+GitHub deletes the merged branch, and a pull request still based on a deleted branch is closed for good, so retarget first. After the merge, start a builder for the task of each pull request that you retargeted, on its routing, with the prompt "use the skill taskrock-issue with <task link>. The task is already taken for you. Its base merged: merge the default branch, run Done when again and push." Its head commit changes, so review it again with step 5 before it passes this gate.
 
 A push after the verdict changes the head commit. Review again.
 
@@ -350,6 +366,15 @@ When the parent is missing, run `gh issue edit <new number> --repo <owner>/<repo
 
 ### When a pull request is closed without a merge
 
+First give back each task that is stacked on the closed pull request: its base is the branch of that pull request. Close its pull request when it has one, and release it with a note whose Next step says to claim it again after its blocker merges:
+
+```sh
+gh pr close <pull request of the stacked task>
+taskrock release <stacked task link> --note <file>
+```
+
+Then give back the task of the closed pull request:
+
 ```sh
 taskrock release <task link>
 ```
@@ -401,7 +426,9 @@ Stop in one of these states:
 
 Make sure that each item is true:
 
-- Each pull request that you merged passed the three conditions of step 6, and the `<sha>` of its verdict was the head commit.
+- Each pull request that you merged passed the four conditions of step 6, and the `<sha>` of its verdict was the head commit.
+- You merged a pull request only when its base was the default branch, and you retargeted each pull request based on its branch before the merge.
+- You stacked a task only with `taskrock claim --stacked`, on the task that `taskrock ready --stacked` listed with a `stacked` base.
 - You merged no pull request that had no reviewer.
 - Each finding that you routed was reproduced by the reviewer with a command.
 - You stopped a task after `review.max_rounds` FAIL verdicts and handed it to the user with a note.

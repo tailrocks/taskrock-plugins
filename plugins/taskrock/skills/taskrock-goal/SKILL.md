@@ -92,7 +92,7 @@ A problem that says `<url> breaks the <type> format: <message>` means the body o
 taskrock claim <task link>
 ```
 
-Write no code for an issue that taskrock claim did not take: its Status is In Progress and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers close, and an issue in Triage waits until taskrock-triage sets it to Todo.
+Write no code for an issue that taskrock claim did not take: its Status is In Progress and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers close, or until the manager of taskrock-goal takes it with taskrock claim --stacked, and an issue in Triage waits until taskrock-triage sets it to Todo.
 
 Exit status 3 means that the task is not yours to take: another agent has it, its status is not Todo, or a blocker is still open. Skip that task. When claim refuses, do not build the task: a refused issue in Triage goes to taskrock-triage, and a blocked one waits. There is no limit on how many tasks run at the same time.
 

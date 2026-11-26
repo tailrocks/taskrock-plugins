@@ -39,7 +39,7 @@ This skill changes GitHub. Step 5 edits the body, the routing fields and the sta
 Every comment starts with the line `_Written by an agent._`.
 The skill never builds the issue and never merges.
 
-Write no code for an issue that taskrock claim did not take: its Status is In Progress and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers close, and an issue in Triage waits until taskrock-triage sets it to Todo.
+Write no code for an issue that taskrock claim did not take: its Status is In Progress and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers close, or until the manager of taskrock-goal takes it with taskrock claim --stacked, and an issue in Triage waits until taskrock-triage sets it to Todo.
 
 ## Procedure
 

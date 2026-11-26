@@ -110,6 +110,38 @@ def commands() -> None:
 GH_ISSUE = re.compile(r"gh issue create|gh issue edit[^\n]*--body")
 
 
+FLAG = re.compile(r"(?<![\w-])--[a-z][a-z-]*")
+TASKROCK_LINE = re.compile(r"\btaskrock ([a-z][a-z-]*)(.*)")
+
+
+def flags() -> None:
+    """Each flag that a skill passes to a taskrock command is in the --help of that command."""
+    named: dict[tuple[str, str], Path] = {}
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        text = path.read_text()
+        lines = [line for block in re.findall(r"```sh\n(.*?)```", text, re.S) for line in block.splitlines()]
+        lines += re.findall(r"`(taskrock [^`]*)`", text)
+        for line in lines:
+            match = TASKROCK_LINE.search(line)
+            if not match or match.group(1) in NOT_COMMANDS:
+                continue
+            rest = re.split(r"\s(?:\||&&|;)\s", match.group(2))[0]
+            for flag in FLAG.findall(rest):
+                named.setdefault((match.group(1), flag), path)
+    helps: dict[str, str] = {}
+    for (command, flag), path in sorted(named.items()):
+        if command not in helps:
+            try:
+                result = subprocess.run(
+                    ["taskrock", command, "--help"], capture_output=True, text=True, check=False
+                )
+            except FileNotFoundError:
+                return
+            helps[command] = result.stdout
+        if not re.search(rf"(?<![\w-]){re.escape(flag)}(?![\w-])", helps[command]):
+            problem(path, f"names `taskrock {command} {flag}`, which the installed taskrock lacks")
+
+
 def gh_issue() -> None:
     for path in sorted(SKILLS.glob("*/SKILL.md")):
         for match in GH_ISSUE.findall(path.read_text()):
@@ -201,7 +233,8 @@ def scope() -> None:
 CLAIM_RULE = (
     "Write no code for an issue that taskrock claim did not take: its Status is In Progress "
     "and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers "
-    "close, and an issue in Triage waits until taskrock-triage sets it to Todo."
+    "close, or until the manager of taskrock-goal takes it with taskrock claim --stacked, and an "
+    "issue in Triage waits until taskrock-triage sets it to Todo."
 )
 CLAIM_SKILLS = ["taskrock-goal", "taskrock-issue", "taskrock-triage"]
 TITLE_RULE = (
@@ -219,6 +252,21 @@ def claim_rule() -> None:
             problem(path, "does not state the claim rule: Write no code for an issue that taskrock claim did not take")
 
 
+STACKED_CLAIM = re.compile(r"\btaskrock claim\b[^\n]*--stacked(?![\w-])")
+STACKED_SKILLS = {"taskrock-goal"}
+
+
+def stacked_claims() -> None:
+    """Only the manager in taskrock-goal runs taskrock claim --stacked."""
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        if path.parent.name in STACKED_SKILLS:
+            continue
+        for block in re.findall(r"```sh\n(.*?)```", path.read_text(), re.S):
+            for line in block.splitlines():
+                if STACKED_CLAIM.search(line):
+                    problem(path, "runs `taskrock claim --stacked`. Only the manager in taskrock-goal stacks a task")
+
+
 def title_rule() -> None:
     for name in TITLE_SKILLS:
         path = SKILLS / name / "SKILL.md"
@@ -226,14 +274,18 @@ def title_rule() -> None:
             problem(path, "does not state the title rule")
 
 
+SWITCH = re.compile(r"git (?:switch|checkout|worktree add)\b")
+OTHER_TASK_BRANCH = re.compile(r"feat/issue-(?!<number>)")
+
+
 def branches() -> None:
-    """Only `taskrock claim` creates a branch."""
+    """Only `taskrock claim` creates a branch. A builder works only on its own task branch."""
     for path in sorted(SKILLS.glob("*/SKILL.md")):
         for number, line in enumerate(path.read_text().splitlines(), 1):
             if NEW_BRANCH.search(line):
                 problem(path, f"line {number} creates a branch. Work only on feat/issue-<number>, which taskrock claim creates")
-            if "git worktree add" in line and "feat/issue-<number>" not in line:
-                problem(path, f"line {number} adds a worktree on a branch other than feat/issue-<number>")
+            if SWITCH.search(line) and ("feat/issue-<number>" not in line or OTHER_TASK_BRANCH.search(line)):
+                problem(path, f"line {number} works on a branch other than feat/issue-<number>. A stacked task is built on its own branch, which taskrock claim --stacked creates")
 
 
 def tailrocks() -> None:
@@ -253,10 +305,12 @@ def main() -> int:
     names = skills()
     muse(names)
     commands()
+    flags()
     gh_issue()
     routing()
     scope()
     claim_rule()
+    stacked_claims()
     title_rule()
     branches()
     tailrocks()

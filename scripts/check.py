@@ -130,7 +130,7 @@ BANNED_IN_SKILLS = [
     ),
     (
         re.compile(r"(?:^|\n)\s*(?:[-*]|\d+\.)?\s*defer\b|\bdefer\s*[:\u2013\u2014-]", re.I),
-        "has a `Defer` route. A follow-up is filed under the link and built in the run",
+        "has a `Defer:` route. A follow-up is filed under the link and built in the run",
     ),
     (
         re.compile(
@@ -187,9 +187,15 @@ def scope() -> None:
                 problem(path, f"contains `{match.group(0).strip()}`: {why}")
     docs = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md")), *sorted(SKILLS.glob("*/SKILL.md"))]
     for path in docs:
-        for sentence in sentences(path.read_text()):
-            if BUILD_REQUEST.search(sentence) and not SKILL_NAME.search(sentence):
-                problem(path, f"tells the user to type `{BUILD_REQUEST.search(sentence).group(0)}` without naming a taskrock skill: {sentence.strip()[:80]}")
+        text = path.read_text()
+        for sentence in sentences(text):
+            found = BUILD_REQUEST.search(sentence)
+            if found and not SKILL_NAME.search(sentence):
+                at = text.find(sentence.strip()[:20])
+                if at < 0:
+                    at = max(text.find(found.group(0)), 0)
+                line = text.count("\n", 0, at) + 1
+                problem(path, f"line {line} tells the user to type `{found.group(0).strip('`')}` without naming a taskrock skill")
 
 
 def tailrocks() -> None:

@@ -41,7 +41,7 @@ The input is one link to an initiative, an epic, or a project.
 This skill changes GitHub and starts other agent sessions. It claims and releases tasks, and it posts review comments.
 It merges pull requests in step 6 and closes finished parents in step 7. It files tasks for the owner, Bugs and follow-up tasks with `taskrock apply`, and it appends to the body of a parent with `taskrock edit`.
 
-Every issue that you file is part of this goal. It gets a `parent` under the link and the milestone of the task that it comes from, so it counts when you decide that the work is done. A draft file writes `parent = "<link>"`, and `plan.toml` writes `milestone = "<title>"`.
+Every issue that you file is part of this goal. It gets a `parent` and a milestone by the two rules of "Where a filed issue goes", so it counts when you decide that the work is done. A draft file writes `parent = "<link>"`, and `plan.toml` writes `milestone = "<title>"`.
 
 ## Procedure
 
@@ -150,7 +150,7 @@ Send each finding that counts one of three ways:
 
 - Fix: the builder fixes it. See "When the review fails".
 - Decision: the finding needs a choice that only the owner can make. File a task for the owner with "File an issue" below, and make it block this task.
-- Follow-up: the finding is real but outside this task. File a new Task or Bug with "File an issue" below. Its `parent` is the link of the epic of the reviewed task (the link of the goal when the task has no epic), and it has the milestone of the task. It does not block this task. You build it in this run: step 8 triages a Bug, and a Task is ready as it is filed.
+- Follow-up: the finding is real but outside this task. File a new Task or Bug with "File an issue" below. Its `parent` and its milestone follow "Where a filed issue goes" below, with the reviewed task as the source. It does not block this task. You build it in this run: step 8 triages a Bug, and a Task is ready as it is filed.
 
 You file nothing without a parent and a milestone. A finding is never parked in Triage outside the link.
 
@@ -192,7 +192,7 @@ gh issue close <parent link>
 
 Close the parent only when the first command prints `0`.
 
-When the parent that you closed is an Epic, write the retro. File a task for the owner with "File an issue" below. Its `parent` is the link of the goal, and when the link is an Epic, that Epic. When the link is a project link, which cannot be a parent, its `parent` is the Initiative that holds the Epic (the parent of the Epic). Its milestone is the milestone of the goal link, and for a project link the milestone of the Epic. So it stays inside the link. Its Question asks whether to make the edits to `AGENTS.md` that you propose. Its body lists each finding that appeared in two or more FAIL verdicts of the tasks of this epic, and the edit to `AGENTS.md` that would stop each one. A finding that appeared once is not listed.
+When the parent that you closed is an Epic, write the retro. File a task for the owner with "File an issue" below. Its `parent` and its milestone follow "Where a filed issue goes" below, with the Epic that you closed as the source. Its Question asks whether to make the edits to `AGENTS.md` that you propose. Its body lists each finding that appeared in two or more FAIL verdicts of the tasks of this epic, and the edit to `AGENTS.md` that would stop each one. A finding that appeared once is not listed.
 
 ### 8. Sweep Triage before you stop
 
@@ -205,7 +205,7 @@ gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json nu
 gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 ```
 
-   The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Give such an issue, except the link itself, a parent now. The parent is the link of the goal. For a project link it is the Initiative that holds the other issues of the milestone. When there is more than one such Initiative, print the loose issues, do not say that the work is done, and stop.
+   The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Give such an issue, except the link itself, a parent now. The parent follows "Where a filed issue goes" below, with the loose issue as the source.
 
 ```sh
 gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
@@ -257,11 +257,35 @@ Stop the rounds when the task has `review.max_rounds` FAIL verdicts, when the re
 taskrock release <task link> --note <file>
 ```
 
-3. File a task for the owner with "File an issue" below, with the parent of the task as its `parent`. Make it block the task.
+3. File a task for the owner with "File an issue" below, with the task as the source of "Where a filed issue goes" below. Make it block the task.
+
+### Where a filed issue goes
+
+Every issue that you file has a source: the task it comes from, the Epic that you closed for the retro, or the loose issue of step 8. The same two rules give its `parent` and its milestone everywhere.
+
+**Parent rule.** The `parent` of an issue that you file is an issue under the goal, never a project. Take the first of these that is the goal link or lies under it:
+
+1. The Epic of the source: its nearest ancestor of type Epic.
+2. The parent of the source.
+3. The goal link, when it is an Epic or an Initiative.
+4. For a project link, when nothing nearer exists: the Initiative that holds the other open issues of the milestone. When there is more than one such Initiative, print the issues, do not say that the work is done, and stop.
+
+Read the parent of an issue, and its type, with:
+
+```sh
+gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
+gh issue view <parent link> --json issueType --jq .issueType.name
+```
+
+**Milestone rule.** The milestone of an issue that you file is the milestone of its source. Never read the milestone of a project link. When the source has none, stop, tell the user that it needs one, and file nothing:
+
+```sh
+gh issue view <source link> --json milestone --jq .milestone.title
+```
 
 ### File an issue
 
-Use this for a task for the owner, a Bug, a follow-up task and the retro. Every issue is made with `taskrock apply`. It always has a parent under the link and a milestone.
+Use this for a task for the owner, a Bug, a follow-up task and the retro. Every issue is made with `taskrock apply`. It always has a parent and a milestone from "Where a filed issue goes".
 
 1. Print the empty body of the type. Use `owner` for a task for the owner:
 
@@ -280,15 +304,7 @@ project = "https://github.com/orgs/<owner>/projects/<number>"
 milestone = "<title of the milestone>"
 ```
 
-   The `project` is the delivery project that `taskrock ready` read. The milestone is the milestone of the task that the issue comes from. An issue that comes from the goal itself, such as the retro, gets the milestone of the goal link, and for a project link the milestone of the Epic that the retro is about:
-
-```sh
-gh issue view <task link> --json milestone --jq .milestone.title
-gh issue view <goal link> --json milestone --jq .milestone.title
-gh issue view <epic link> --json milestone --jq .milestone.title
-```
-
-   Use the first command for an issue that comes from a task, the second for an issue that comes from the goal, and the third for the retro of a project link. When the command prints nothing, stop and tell the user that the task, the goal or the Epic needs a milestone. File nothing without one.
+   The `project` is the delivery project that `taskrock ready` read. The `milestone` is the one that the milestone rule gives.
 
 3. Write one file, `<key>.md`, with the front matter and then the body from step 1, every section filled in. A task for the owner:
 
@@ -302,7 +318,7 @@ agent = "Owner"
 +++
 ```
 
-The `parent` is the link of the epic of the task, or the link of the goal. A Bug has `type = "Bug"`, the same `parent`, and no routing key. Its `## How to reproduce` is the command of the reviewer and its failing output. A follow-up task has `type = "Task"`, the same `parent`, and the routing keys that `taskrock-plan` writes.
+The `parent` is the link that the parent rule gives. A Bug has `type = "Bug"`, the same `parent`, and no routing key. Its `## How to reproduce` is the command of the reviewer and its failing output. A follow-up task has `type = "Task"`, the same `parent`, and the routing keys that `taskrock-plan` writes.
 
 4. Check and create it:
 

@@ -88,7 +88,7 @@ taskrock claim <link>
 - Exit status 0: the task is yours. Its branch `feat/issue-<number>` exists on GitHub.
 - Exit status 3: the answer is no. Another agent has it, its status is not Todo, or a blocker is still open. Stop and say so. When the issue is a Bug or a Feature in Triage, load the skill `taskrock-triage` with it instead, and stop this one.
 
-Write no code for an issue that taskrock claim did not take: its Status is In Progress and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers close, and an issue in Triage waits until taskrock-triage sets it to Todo.
+Write no code for an issue that taskrock claim did not take: its Status is In Progress and its branch feat/issue-<number> is on GitHub. A blocked task waits until its blockers close, or until the manager of taskrock-goal takes it with taskrock claim --stacked, and an issue in Triage waits until taskrock-triage sets it to Todo.
 
 ### 4. Switch to the branch
 

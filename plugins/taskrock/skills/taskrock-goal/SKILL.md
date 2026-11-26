@@ -282,7 +282,7 @@ taskrock release <task link> --note <file>
 
 ### Give back the tasks stacked on a task
 
-A task stacked on a base that cannot finish in this run stays In Progress and keeps the run from stopping. Use the stack record of step 3 to find them. Do not list pull requests with `gh pr list --base`: `release` renames a base branch that has commits to `feat/issue-<n>-parked-<time>`, and a builder may not have opened its pull request yet.
+A task stacked on a base that cannot finish in this run stays In Progress and keeps the run from stopping. Use the stack record of step 3 to find them. Do not look for them by listing pull requests by base: `release` renames a base branch that has commits to `feat/issue-<n>-parked-<time>`, and a builder may not have opened its pull request yet.
 
 1. Take from the record every task whose base is the branch of this task, and then every task whose base is the branch of one of those, until no new task appears. Take them all before you release any.
 2. Go through them top-down: the highest task of the stack first, the task that sits right on this task last. For each one, close its pull request when it has one, write a note file with the four sections of "Hand a task to the user" where `Next step` says to claim the task again after its base is settled, and release it:

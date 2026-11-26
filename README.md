@@ -15,7 +15,15 @@ The plugin `taskrock` for five agent CLIs: Claude Code, Codex, Grok Build, Muse 
 
 ## Install
 
-See [docs/installation.md](docs/installation.md) for each agent.
+| Agent | Commands |
+| --- | --- |
+| Claude Code | `claude plugin marketplace add tailrocks/taskrock-plugins` then `claude plugin install taskrock@taskrock --scope user` |
+| Codex | `codex plugin marketplace add tailrocks/taskrock-plugins` then `codex plugin add taskrock@taskrock` |
+| Grok Build | `grok plugin marketplace add tailrocks/taskrock-plugins` then `grok plugin install taskrock --trust` |
+| Muse Code | `muse plugins marketplace add taskrock tailrocks/taskrock-plugins` then `muse plugins install taskrock@taskrock` |
+| Antigravity | `git clone https://github.com/tailrocks/taskrock-plugins` then `agy plugin install ./taskrock-plugins/plugins/taskrock` |
+
+Call a skill with `/taskrock:taskrock-plan` in Claude Code, `$taskrock:taskrock-plan` in Codex, and `/taskrock-plan` in Grok Build, Muse Code and Antigravity. [docs/installation.md](docs/installation.md) has the tested versions, updates, removal, and how to remove the old plugin `tailrocks-taskrock-skills`.
 
 ## Develop
 

@@ -51,7 +51,13 @@ It must print `taskrock 0.2.0` or a newer version. If the command is missing or 
 
 ### 1. Route the link
 
-When the user gave the link of an issue, run the command of the routing table above. A Bug or a Feature with no sub-issues stays here only when its status is Triage (step 3 shows the status). Any other issue goes to the skill that the table names: load it and stop.
+When the user gave the link of an issue, find its kind:
+
+```sh
+gh issue view <link> --json issueType,subIssuesSummary --jq '"\(.issueType.name) \(.subIssuesSummary.total)"'
+```
+
+A Bug or a Feature with no sub-issues stays here only when its status is Triage (step 3 shows the status). Any other issue goes to the skill that the table names: load it and stop.
 A project link stays here when the user asks to triage. Use `taskrock-goal` for a project link when the user asks to build.
 
 ### 2. Read the config
@@ -60,7 +66,7 @@ A project link stays here when the user asks to triage. Use `taskrock-goal` for 
 gh api -H "Accept: application/vnd.github.raw" repos/<owner>/.github/contents/taskrock.toml
 ```
 
-The file holds the formats of the issue types and the subagent and model blocks for routing. When it is missing, say so and use `taskrock template <type>` for the formats.
+The file holds the formats of the issue types and the subagent and model blocks for routing. When it is missing, say so and use `taskrock template <type> --owner <owner>` for the formats.
 
 ### 3. List the Triage items
 
@@ -110,7 +116,7 @@ Use it when the report is true, it is not built yet, and you can make every deci
 1. Get the sections of the type:
 
 ```sh
-taskrock template <type>
+taskrock template <type> --owner <owner>
 ```
 
 2. Write the whole body to a file, with no front matter. Keep the sections of the report and add the build sections. A Bug adds `## Cause`, `## Decisions already made`, `## Steps`, `## Done when` and `## Out of scope`. A Feature adds `## Decisions already made`, `## Steps`, `## Done when` and `## Out of scope`. A section that does not apply says `None.` and the reason.
@@ -128,7 +134,13 @@ taskrock edit <link> <file>
 gh api orgs/<owner>/issue-fields --jq '.[] | "\(.id) \(.name): \([.options[].name] | join(", "))"'
 ```
 
-Write one JSON file with an entry for each of `Agent`, `Runtime`, `Model`, `Effort`, `Review agent`, `Review runtime`, `Review model` and `Review effort`, then set them:
+Write one JSON file with an entry for each of `Agent`, `Runtime`, `Model`, `Effort`, `Review agent`, `Review runtime`, `Review model` and `Review effort`. Each entry is `{"field_id": <ID of the field>, "value": "<option name>"}`:
+
+```json
+{"issue_field_values": [{"field_id": 123, "value": "<option name>"}]}
+```
+
+Then set them:
 
 ```sh
 gh api -X POST repos/<owner>/<repo>/issues/<number>/issue-field-values --input <file>
@@ -148,11 +160,17 @@ gh project item-edit --project-id <project id> --id <item id> --field-id <Status
 taskrock ready <project link>
 ```
 
-A Feature that is too big for one task gets sub-issues instead of Steps. The body of the Feature ends with the marker line `<!-- taskrock:<plan id>:<key> -->`. Make a folder outside the repository with `plan.toml` (`id` is the plan id, plus `repo` and `project`), a file for the Feature with that `key` and its body, and one file for each sub-issue with `parent = "<key>"`. Write each sub-issue as `taskrock-plan` does. Then:
+A Feature that is too big for one task gets sub-issues instead of Steps. Make a folder outside the repository with `plan.toml` (a new `id`, plus `repo` and `project`) and one file for each sub-issue, with no `parent` key. Write each sub-issue as `taskrock-plan` does. The folder holds the sub-issues only, never the Feature. Then:
 
 ```sh
 taskrock check <folder>
 taskrock apply <folder>
+```
+
+`apply` prints `created #<number> <key> <title>` for each sub-issue. Attach each one to the Feature:
+
+```sh
+gh issue edit <sub-issue number> --repo <owner>/<repo> --parent <link of the Feature>
 ```
 
 Delete the folder. The Feature is now a parent: set its Status to Todo as in item 5. Do not set its routing fields.

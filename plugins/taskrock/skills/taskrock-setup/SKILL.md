@@ -57,7 +57,7 @@ Find the facts by running commands. Never ask the owner for a fact that a comman
 
 ```sh
 gh api orgs/<owner>/issue-types --jq '.[].name'
-gh api orgs/<owner>/issue-fields --jq '.[] | "\(.name): \([.options[]?.name] | join(", "))"'
+gh api orgs/<owner>/issue-fields --jq '.[] | "\(.name): \([(.options // [])[].name] | join(", "))"'
 gh project list --owner <owner> --format json
 gh repo list <owner> --limit 200 --json name,description,isArchived
 gh api -H "Accept: application/vnd.github.raw" repos/<owner>/.github/contents/taskrock.toml

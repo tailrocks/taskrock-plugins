@@ -1,6 +1,6 @@
 interface:
   display_name: "Taskrock: Issue"
-  short_description: "Build one planned GitHub issue and open its pull request"
+  short_description: "Build one Task, Bug or Feature issue that has no sub-issues, and open its pull request"
   default_prompt: "Use $taskrock-issue on this issue link."
 policy:
   allow_implicit_invocation: true

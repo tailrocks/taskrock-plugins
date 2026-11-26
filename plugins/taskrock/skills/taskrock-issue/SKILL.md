@@ -1,7 +1,7 @@
 ---
 name: taskrock-issue
 description: >-
-  Work on one GitHub issue that was planned with taskrock. Read the task, take it, build it by its Steps, prove it by its Done when, and open the pull request. Use when the user says "Do" with the link of one issue, or when a manager hands you one task. Do not use it to plan work or to run a whole initiative, epic or project: use taskrock-plan or taskrock-goal.
+  Build exactly one GitHub issue of type Task, Bug or Feature that has no sub-issues, and open its pull request. Use when the user says Do <link> or a manager hands you one task. If the link is a project, an Initiative, an Epic or any issue with sub-issues, use taskrock-goal instead.
 license: Apache-2.0
 ---
 
@@ -27,15 +27,14 @@ If the link belongs to another skill, load that skill and stop this one.
 
 You get one issue link. The issue is the whole task. Build only what it says.
 
-Use this skill when the user gives you the link of one issue that taskrock planned. Use it also when a manager hands you one task.
-Use `taskrock-plan` to plan work. Use `taskrock-goal` to build everything under an initiative, an epic, or a project.
+Use this skill when the user gives you the link of one issue of type Task, Bug or Feature that has no sub-issues. Use it also when a manager hands you one task.
 
 ## Before you start
 
 This skill needs the `taskrock` command-line tool, version 0.2.0, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
 The input is one issue link. The issue holds the Steps, the Done when list, and the Out of scope list.
 
-This skill changes GitHub. Step 2 takes the task for you. Step 4 pushes commits to the task branch. Step 6 opens a pull request.
+This skill changes GitHub. Step 3 takes the task for you. Step 5 pushes commits to the task branch. Step 8 opens a pull request.
 The skill never merges. The manager merges.
 
 ## Procedure
@@ -48,16 +47,28 @@ taskrock --version
 
 It must print `taskrock 0.2.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.2.0 or newer. Do not go on.
 
-### 1. Read
+### 1. Route
+
+Skip this step when the user gave no link, for example when a manager hands you a task that is already taken for you.
+
+```sh
+gh issue view <link> --json issueType,subIssuesSummary --jq '"\(.issueType.name) \(.subIssuesSummary.total)"'
+```
+
+Compare the answer with the routing table in "Use this skill". If the link belongs to another skill, load that skill and stop this one.
+
+### 2. Read
 
 ```sh
 gh issue view <link>
+gh issue view <link> --comments
 gh api repos/<owner>/<repo>/issues/<number> --jq '[.issue_field_values[] | "\(.issue_field_name)=\(.single_select_option.name)"] | join("; ")'
 ```
 
-The second command prints who builds and who reviews. Read `AGENTS.md` in the repository too.
+Read every comment. Triage notes and handoff notes are part of the task. A handoff note says what an earlier agent did, what it verified, the state, and the next step.
+The last command prints who builds and who reviews. Read `AGENTS.md` in the repository too.
 
-### 2. Take the task
+### 3. Take the task
 
 Skip this step when the manager told you that the task is already taken for you.
 
@@ -68,7 +79,7 @@ taskrock claim <link>
 - Exit status 0: the task is yours. Its branch `feat/issue-<number>` exists on GitHub.
 - Exit status 3: the answer is no. Another agent has it, or it is not ready. Stop and say so.
 
-### 3. Switch to the branch
+### 4. Switch to the branch
 
 ```sh
 git fetch origin feat/issue-<number>
@@ -83,7 +94,7 @@ git worktree add ../<repo>-issue-<number> feat/issue-<number>
 
 Never create another branch.
 
-### 4. Build
+### 5. Build
 
 - Follow `Steps` in order.
 - Use the names in `Decisions already made` exactly: files, types, functions, commands, messages.
@@ -91,11 +102,22 @@ Never create another branch.
 - Stay inside `Out of scope`.
 - Commit often, with `git commit -s`. Push often.
 
-### 5. Prove
+### 6. Prove
 
 Run every command under `Done when`. Keep each command and the output you saw. A box is done only after you saw the result yourself.
 
-### 6. Open the pull request
+### 7. Merge the default branch
+
+Other tasks may have merged while you built. Bring their work in, then prove again.
+
+```sh
+git fetch origin
+git merge origin/<default branch>
+```
+
+Fix any conflict. Then run every command under `Done when` again and keep the new output. Open the pull request only after every box passes on the merged branch.
+
+### 8. Open the pull request
 
 Write the body to a file. It has four sections and one line:
 
@@ -108,7 +130,7 @@ Write the body to a file. It has four sections and one line:
 Closes #<number>
 ```
 
-`Proof` holds each `Done when` command with its output. `Done when` repeats the checklist with every box ticked.
+`Proof` holds each `Done when` command with its output from step 7. `Done when` repeats the checklist with every box ticked.
 
 ```sh
 GH_PR_CREATE_DRAFT=0 gh pr create --base <default branch> --head feat/issue-<number> --title "<type>: <summary>" --body-file <file>
@@ -116,28 +138,61 @@ GH_PR_CREATE_DRAFT=0 gh pr create --base <default branch> --head feat/issue-<num
 
 The title follows Conventional Commits.
 
-### When the task is wrong
+### When you stop before the pull request
 
-The task can name a file that moved, or a step that no longer fits. Do not guess and do not push on.
+The task can name a file that moved, a step that no longer fits, or a blocker that you cannot remove. Do not guess and do not push on.
 
-```sh
-gh issue comment <link> --body-file <file>
-taskrock release <link>
+Write a note file with these sections:
+
+```markdown
+## Done
+## Verified
+## State
+## Next step
 ```
 
-Write in the comment what you found and why you cannot go on. Then stop.
+`Done` lists what you built. `Verified` lists each command you ran and what it printed. `State` says where the work is: the branch, the last commit, and what is wrong or what blocks. `Next step` says what the next agent should do first.
+
+```sh
+taskrock release <link> --note <file>
+```
+
+The command posts the note as a comment on the issue and gives the task back. Then stop.
+
+### When taskrock gets in your way
+
+When taskrock itself is the problem (a command fails for a good input, a skill step does not work, a message misleads), file a Bug, then go on with your task.
+
+```sh
+mkdir <folder>
+taskrock template Bug > <folder>/B1.md
+```
+
+Fill `<folder>/B1.md`. The front matter has `key`, `title` and `type = "Bug"`, and no routing key. Write every section of the template. Write a `<folder>/plan.toml` with the delivery project, in the format of `taskrock-plan`.
+
+```sh
+taskrock apply <folder>
+```
+
+The Bug lands in Triage. Then go on with your task. Use a folder outside the repository.
 
 ## Result
 
-Report the link of the pull request and stop. Do not merge.
+The last line of your report is exactly one of these:
 
-When the task is wrong, the result is the comment on the issue and the released task.
+- `DONE <pull request link>`: the pull request is open. Do not merge.
+- `BLOCKED <what blocks, and the link of the blocker>`: you stopped, wrote the note and released the task.
+- `TASK_WRONG <what is wrong>`: the task is wrong, you wrote the note and released the task.
 
 ## Completion checks
 
 Make sure that each item is true:
 
+- You checked that the link belongs to this skill.
+- You read the issue and every comment.
 - `taskrock claim` exited with status 0, or the manager had taken the task for you.
-- You ran every command under `Done when` and saw its result yourself.
+- You merged the default branch into the task branch and ran every command under `Done when` again, and saw its result yourself.
 - The pull request body has the sections `Why`, `What`, `Proof`, and `Done when`, and the line `Closes #<number>`.
+- When you stopped before the pull request, the note has the sections `Done`, `Verified`, `State` and `Next step`, and `taskrock release <link> --note <file>` ran.
+- The last line of your report is `DONE`, `BLOCKED` or `TASK_WRONG`, as described under "Result".
 - You did not merge the pull request.

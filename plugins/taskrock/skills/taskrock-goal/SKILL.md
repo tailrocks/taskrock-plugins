@@ -285,7 +285,11 @@ taskrock release <task link> --note <file>
 A task stacked on a base that cannot finish in this run stays In Progress and keeps the run from stopping. Use the stack record of step 3 to find them. Do not look for them by listing pull requests by base: `release` renames a base branch that has commits to `feat/issue-<n>-parked-<time>`, and a builder may not have opened its pull request yet.
 
 1. Take from the record every task whose base is the branch of this task, and then every task whose base is the branch of one of those, until no new task appears. Take them all before you release any.
-2. Go through them top-down: the highest task of the stack first, the task that sits right on this task last. For each one, close its pull request when it has one, write a note file with the four sections of "Hand a task to the user" where `Next step` says to claim the task again after its base is settled, and release it:
+2. Go through them top-down: the highest task of the stack first, the task that sits right on this task last. For each one, in this order:
+
+   1. Stop the builder that you started for it in step 4: the helper or the session. When it cannot be stopped, wait for its final reply. Do nothing else to the task before the builder has stopped, or it keeps going and opens a pull request for a released task.
+   2. Close any pull request that it opened.
+   3. Write a note file with the four sections of "Hand a task to the user" where `Next step` says to claim the task again after its base is settled, and release it:
 
 ```sh
 gh pr close <pull request of the stacked task>
@@ -460,5 +464,5 @@ Make sure that each item is true:
 - You triaged each Triage item once, and stopped with the list of the items that wait for their reporter.
 - You closed a parent only after the sub-issue count printed `0`.
 - You released each task whose pull request closed without a merge.
-- Before you released or reported a task that waits on the owner or on a reviewer, you gave back every task stacked on it, transitively and top-down, from the stack record, and you put each on the run list. You did not take a task of the run list again.
+- Before you released or reported a task that waits on the owner or on a reviewer, you gave back every task stacked on it, transitively and top-down, from the stack record: you stopped its builder first, then closed its pull request, then released it, and you put it on the run list. You did not take a task of the run list again.
 - You told the user about each problem that you could not fix.

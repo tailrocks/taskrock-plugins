@@ -26,6 +26,11 @@
         "enabledDefault": true
       },
       {
+        "id": "taskrock-setup",
+        "path": "skills/taskrock-setup/SKILL.md",
+        "enabledDefault": true
+      },
+      {
         "id": "taskrock-triage",
         "path": "skills/taskrock-triage/SKILL.md",
         "enabledDefault": true

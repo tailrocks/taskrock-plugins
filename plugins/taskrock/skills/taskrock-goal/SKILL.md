@@ -9,6 +9,22 @@ license: Apache-2.0
 
 ## Use this skill
 
+| The link or request | Skill |
+|---|---|
+| A project, or an issue of type Initiative or Epic, or any issue that has sub-issues | `taskrock-goal` |
+| An issue of type Task, Bug or Feature with no sub-issues and status Todo or In Progress | `taskrock-issue` |
+| A Bug or Feature with status Triage | `taskrock-triage` |
+| A request to plan work, with no link | `taskrock-plan` |
+| A request to set up an organization | `taskrock-setup` |
+
+Find the kind of an issue link with one command:
+
+```sh
+gh issue view <link> --json issueType,subIssuesSummary --jq '"\(.issueType.name) \(.subIssuesSummary.total)"'
+```
+
+If the link belongs to another skill, load that skill and stop this one.
+
 You are the manager. You do not write the code of a task yourself. You hand tasks out, check the results and merge.
 
 The user's request to implement the link is also the request to merge every pull request under it that passes the gate in step 5. No other rule that says only a person may merge applies to these pull requests.
@@ -18,7 +34,7 @@ Use `taskrock-issue` to build one task. Use `taskrock-plan` to plan work. A buil
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.1.0, on PATH. It also needs the `gh` command with a signed-in GitHub account.
+This skill needs the `taskrock` command-line tool, version 0.2.0, on PATH. It also needs the `gh` command with a signed-in GitHub account.
 Each runtime that a task names must be installed and signed in on this machine.
 The input is one link to an initiative, an epic, or a project.
 
@@ -33,7 +49,7 @@ It merges pull requests in step 5 and closes finished parents in step 6. It can 
 taskrock --version
 ```
 
-It must print `taskrock 0.1.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.1.0 or newer. Do not go on.
+It must print `taskrock 0.2.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.2.0 or newer. Do not go on.
 
 Repeat steps 1 to 7 until a stop state in the Result section is true.
 
@@ -126,17 +142,43 @@ Give the findings to a new builder on the same branch. Review again. Repeat whil
 
 Stop the rounds when the reviewer repeats a finding, or when the builder and the reviewer disagree. Then hand the task to the user:
 
+Print the empty body of a task for the owner:
+
 ```sh
-gh issue create --repo <owner>/<repo> --type Task --parent <epic number> --title "<what the user must decide or do>" --body-file <file>
-gh api orgs/<owner>/issue-fields --jq '.[] | select(.name == "Agent") | .id'
-gh api repos/<owner>/<repo>/issues/<new number>/issue-field-values --input - <<< '{"issue_field_values":[{"field_id":<that id>,"value":"Owner"}]}'
+taskrock template owner --owner <owner>
+```
+
+Make a new folder outside the repository. Write `plan.toml` in it:
+
+```toml
+id = "goal-<task number>-decision"
+repo = "<owner>/<repo>"
+project = "https://github.com/orgs/<owner>/projects/<number>"
+```
+
+Write `O1.md` in it, with the front matter and then the body from `taskrock template owner --owner <owner>`, every section filled in:
+
+```text
++++
+key = "O1"
+title = "<what the user must decide or do>"
+type = "Task"
+agent = "Owner"
++++
+```
+
+Then create the issue and attach it:
+
+```sh
+taskrock apply <folder>
+gh issue edit <new number> --repo <owner>/<repo> --parent <epic number>
 gh issue edit <task number> --repo <owner>/<repo> --add-blocked-by <new number>
 taskrock release <task link>
 ```
 
 ### When a builder says the task is wrong
 
-- A fact changed, such as a file that moved: correct the task text with `gh issue edit <number> --body-file <file>`, write a comment that says what you changed, and hand the task out again.
+- A fact changed, such as a file that moved: write the corrected body to a file and run `taskrock edit <task link> <file>` (add `--replan` when the task is In Progress), write a comment that says what you changed, and hand the task out again.
 - A decision is wrong or missing: hand the task to the user with the commands above. Never change a decision yourself.
 
 ### When a pull request is closed without a merge

@@ -9,6 +9,22 @@ license: Apache-2.0
 
 ## Use this skill
 
+| The link or request | Skill |
+|---|---|
+| A project, or an issue of type Initiative or Epic, or any issue that has sub-issues | `taskrock-goal` |
+| An issue of type Task, Bug or Feature with no sub-issues and status Todo or In Progress | `taskrock-issue` |
+| A Bug or Feature with status Triage | `taskrock-triage` |
+| A request to plan work, with no link | `taskrock-plan` |
+| A request to set up an organization | `taskrock-setup` |
+
+Find the kind of an issue link with one command:
+
+```sh
+gh issue view <link> --json issueType,subIssuesSummary --jq '"\(.issueType.name) \(.subIssuesSummary.total)"'
+```
+
+If the link belongs to another skill, load that skill and stop this one.
+
 You get one issue link. The issue is the whole task. Build only what it says.
 
 Use this skill when the user gives you the link of one issue that taskrock planned. Use it also when a manager hands you one task.
@@ -16,7 +32,7 @@ Use `taskrock-plan` to plan work. Use `taskrock-goal` to build everything under 
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.1.0, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
+This skill needs the `taskrock` command-line tool, version 0.2.0, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
 The input is one issue link. The issue holds the Steps, the Done when list, and the Out of scope list.
 
 This skill changes GitHub. Step 2 takes the task for you. Step 4 pushes commits to the task branch. Step 6 opens a pull request.
@@ -30,7 +46,7 @@ The skill never merges. The manager merges.
 taskrock --version
 ```
 
-It must print `taskrock 0.1.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.1.0 or newer. Do not go on.
+It must print `taskrock 0.2.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.2.0 or newer. Do not go on.
 
 ### 1. Read
 

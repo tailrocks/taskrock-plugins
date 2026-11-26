@@ -9,6 +9,22 @@ license: Apache-2.0
 
 ## Use this skill
 
+| The link or request | Skill |
+|---|---|
+| A project, or an issue of type Initiative or Epic, or any issue that has sub-issues | `taskrock-goal` |
+| An issue of type Task, Bug or Feature with no sub-issues and status Todo or In Progress | `taskrock-issue` |
+| A Bug or Feature with status Triage | `taskrock-triage` |
+| A request to plan work, with no link | `taskrock-plan` |
+| A request to set up an organization | `taskrock-setup` |
+
+Find the kind of an issue link with one command:
+
+```sh
+gh issue view <link> --json issueType,subIssuesSummary --jq '"\(.issueType.name) \(.subIssuesSummary.total)"'
+```
+
+If the link belongs to another skill, load that skill and stop this one.
+
 You turn what the user explained into issues on GitHub. Another agent, on a weaker model, builds each task later with no other context. So you make every design decision now and write it into the task.
 
 Use this skill when the user asks to plan work on GitHub or types `/taskrock-plan`.
@@ -16,7 +32,7 @@ This skill only plans. Use `taskrock-issue` to build one task. Use `taskrock-goa
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.1.0, on PATH. It also needs the `gh` command with a signed-in GitHub account.
+This skill needs the `taskrock` command-line tool, version 0.2.0, on PATH. It also needs the `gh` command with a signed-in GitHub account.
 The GitHub organization must have the taskrock issue types and routing fields. The README of the taskrock repository gives the setup script.
 
 Step 6 creates the issues on GitHub. The skill writes nothing else to GitHub.
@@ -30,7 +46,7 @@ Do not run step 6 before the user approves the breakdown in step 4.
 taskrock --version
 ```
 
-It must print `taskrock 0.1.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.1.0 or newer. Do not go on.
+It must print `taskrock 0.2.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.2.0 or newer. Do not go on.
 
 ### 1. Understand first, ask last
 

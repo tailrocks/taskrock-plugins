@@ -107,6 +107,22 @@ def commands() -> None:
             problem(path, f"names `taskrock {command}`, which the installed taskrock lacks")
 
 
+GH_ISSUE = re.compile(r"gh issue create|gh issue edit[^\n]*--body")
+
+
+def gh_issue() -> None:
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        for match in GH_ISSUE.findall(path.read_text()):
+            problem(path, f"names `{match}`. Use taskrock apply or taskrock edit")
+
+
+def routing() -> None:
+    table = (ROOT / "scripts" / "routing.md").read_text()
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        if table not in path.read_text():
+            problem(path, "does not contain the text of scripts/routing.md")
+
+
 def tailrocks() -> None:
     for path in ROOT.rglob("*"):
         relative = path.relative_to(ROOT)
@@ -124,6 +140,8 @@ def main() -> int:
     names = skills()
     muse(names)
     commands()
+    gh_issue()
+    routing()
     tailrocks()
     for line in problems:
         print(line)

@@ -124,26 +124,72 @@ def routing() -> None:
 
 
 BANNED_IN_SKILLS = [
-    (re.compile(r"Do not make this task wait"), "a deferred finding must not run outside the goal"),
-    (re.compile(r"\bDefer:"), "has a `Defer:` route. A follow-up is filed under the link and built in the run"),
-    (re.compile(r"have no milestone, so they do not count"), "says that Bugs do not count"),
+    (
+        re.compile(r"(?:do not|don't|never)\s+make\s+this\s+task\s+wait", re.I),
+        "a finding must not run outside the goal",
+    ),
+    (
+        re.compile(r"(?:^|\n)\s*(?:[-*]|\d+\.)?\s*defer\b|\bdefer\s*[:\u2013\u2014-]", re.I),
+        "has a `Defer` route. A follow-up is filed under the link and built in the run",
+    ),
+    (
+        re.compile(
+            r"(?:bugs?|friction)[^.\n]{0,80}?(?:do(?:es)?\s+not|don't|doesn't|never|not)\s+count(?:ed)?\b"
+            r"|no\s+milestone,?\s+so\b",
+            re.I,
+        ),
+        "says that Bugs do not count or have no milestone",
+    ),
 ]
-UNNAMED_BUILD = re.compile(r"\b(?:Do|Implement) <[a-z ]*(?:link|url)[a-z ]*>")
+BUILD_REQUEST = re.compile(
+    r"\b(?:do|implement|build)\s+(?:`?<[^>`]*(?:link|url)[^>`]*>`?|`?https?://\S+)", re.I
+)
 SKILL_NAME = re.compile(r"taskrock-(?:goal|issue|plan|triage|setup)")
+MARKUP = re.compile(r"[*_`]")
+
+
+def sentences(text: str) -> list[str]:
+    """Split Markdown into sentences. A wrapped paragraph and a folded front-matter value join up."""
+    units: list[str] = []
+    paragraph: list[str] = []
+    fenced = False
+
+    def flush() -> None:
+        if paragraph:
+            units.extend(re.split(r"(?<=[.!?])\s+(?=[A-Z\"`<])", " ".join(paragraph)))
+            paragraph.clear()
+
+    for line in text.splitlines():
+        if line.lstrip().startswith("```"):
+            flush()
+            fenced = not fenced
+        elif fenced:
+            units.append(line)
+        elif not line.strip():
+            flush()
+        elif re.match(r"\s*(?:[-*]\s|\d+\.\s|\||#)", line):
+            flush()
+            paragraph.append(line.strip())
+        else:
+            paragraph.append(line.strip())
+    flush()
+    return units
 
 
 def scope() -> None:
     """A build request names its skill, and no skill sends a finding outside the goal."""
     for path in sorted(SKILLS.glob("*/SKILL.md")):
-        text = path.read_text()
+        text = MARKUP.sub("", path.read_text())
+        flat = re.sub(r"[ \t]+", " ", text)
         for pattern, why in BANNED_IN_SKILLS:
-            if pattern.search(text):
-                problem(path, f"contains `{pattern.pattern}`: {why}")
+            match = pattern.search(flat)
+            if match:
+                problem(path, f"contains `{match.group(0).strip()}`: {why}")
     docs = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md")), *sorted(SKILLS.glob("*/SKILL.md"))]
     for path in docs:
-        for number, line in enumerate(path.read_text().splitlines(), 1):
-            if UNNAMED_BUILD.search(line) and not SKILL_NAME.search(line):
-                problem(path, f"line {number} tells the user to type `Do <link>` or `Implement <link>` without naming a taskrock skill")
+        for sentence in sentences(path.read_text()):
+            if BUILD_REQUEST.search(sentence) and not SKILL_NAME.search(sentence):
+                problem(path, f"tells the user to type `{BUILD_REQUEST.search(sentence).group(0)}` without naming a taskrock skill: {sentence.strip()[:80]}")
 
 
 def tailrocks() -> None:

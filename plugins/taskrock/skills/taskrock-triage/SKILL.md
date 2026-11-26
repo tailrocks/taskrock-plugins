@@ -70,6 +70,15 @@ The file holds the formats of the issue types and the subagent and model blocks 
 
 ### 3. List the Triage items
 
+With an issue link, find its project. The title is the name of the project:
+
+```sh
+gh issue view <link> --json projectItems --jq '.projectItems[].title'
+gh project list --owner <owner> --format json --jq '.projects[] | select(.title == "<title>") | .number'
+```
+
+List the items of the project:
+
 ```sh
 gh project item-list <number> --owner <owner> --format json --limit 200
 ```
@@ -85,7 +94,14 @@ Do steps 4 to 6 for one issue at a time.
 
 ### 4. Check the issue
 
-Read the issue, with its comments, and `AGENTS.md` of its repository. Then, before you decide anything:
+Read the issue, its comments, and `AGENTS.md` of its repository:
+
+```sh
+gh issue view <link>
+gh issue view <link> --comments
+```
+
+Then, before you decide anything:
 
 1. Search the code for an existing implementation. Use the words of the report. Do it on the up-to-date default branch.
 
@@ -131,7 +147,7 @@ taskrock edit <link> <file>
 4. Set the eight routing fields as `taskrock-plan` does. Read the allowed values and the field IDs from the account. Pick a subagent that can build, then a runtime from its list in the config, then a model that lists that runtime (use its `use` text to choose), then an effort from that model. The reviewer is a subagent that can review, on a different model.
 
 ```sh
-gh api orgs/<owner>/issue-fields --jq '.[] | "\(.id) \(.name): \([.options[].name] | join(", "))"'
+gh api orgs/<owner>/issue-fields --jq '.[] | "\(.id) \(.name): \([(.options // [])[].name] | join(", "))"'
 ```
 
 Write one JSON file with an entry for each of `Agent`, `Runtime`, `Model`, `Effort`, `Review agent`, `Review runtime`, `Review model` and `Review effort`. Each entry is `{"field_id": <ID of the field>, "value": "<option name>"}`:

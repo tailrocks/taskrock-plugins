@@ -142,18 +142,43 @@ Give the findings to a new builder on the same branch. Review again. Repeat whil
 
 Stop the rounds when the reviewer repeats a finding, or when the builder and the reviewer disagree. Then hand the task to the user:
 
+Print the empty body of a task for the owner:
+
 ```sh
-taskrock template Task
-taskrock apply --repo <owner>/<repo> --type Task --parent <epic number> --title "<what the user must decide or do>" --body-file <file>
-gh api orgs/<owner>/issue-fields --jq '.[] | select(.name == "Agent") | .id'
-gh api repos/<owner>/<repo>/issues/<new number>/issue-field-values --input - <<< '{"issue_field_values":[{"field_id":<that id>,"value":"Owner"}]}'
+taskrock template owner --owner <owner>
+```
+
+Make a new folder outside the repository. Write `plan.toml` in it:
+
+```toml
+id = "goal-<task number>-decision"
+repo = "<owner>/<repo>"
+project = "https://github.com/orgs/<owner>/projects/<number>"
+```
+
+Write `O1.md` in it, with the front matter and then the body from `taskrock template owner --owner <owner>`, every section filled in:
+
+```text
++++
+key = "O1"
+title = "<what the user must decide or do>"
+type = "Task"
+agent = "Owner"
++++
+```
+
+Then create the issue and attach it:
+
+```sh
+taskrock apply <folder>
+gh issue edit <new number> --repo <owner>/<repo> --parent <epic number>
 gh issue edit <task number> --repo <owner>/<repo> --add-blocked-by <new number>
 taskrock release <task link>
 ```
 
 ### When a builder says the task is wrong
 
-- A fact changed, such as a file that moved: correct the task text with `taskrock edit <number> --body-file <file>`, write a comment that says what you changed, and hand the task out again.
+- A fact changed, such as a file that moved: write the corrected body to a file and run `taskrock edit <task link> <file>` (add `--replan` when the task is In Progress), write a comment that says what you changed, and hand the task out again.
 - A decision is wrong or missing: hand the task to the user with the commands above. Never change a decision yourself.
 
 ### When a pull request is closed without a merge

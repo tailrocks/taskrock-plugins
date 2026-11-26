@@ -29,22 +29,6 @@ You get one issue link. The issue is the whole task. Build only what it says.
 
 Use this skill when the user gives you the link of one issue of type Task, Bug or Feature that has no sub-issues. Use it also when a manager hands you one task.
 
-| The link or request | Skill |
-|---|---|
-| A project, or an issue of type Initiative or Epic, or any issue that has sub-issues | `taskrock-goal` |
-| An issue of type Task, Bug or Feature with no sub-issues and status Todo or In Progress | `taskrock-issue` |
-| A Bug or Feature with status Triage | `taskrock-triage` |
-| A request to plan work, with no link | `taskrock-plan` |
-| A request to set up an organization | `taskrock-setup` |
-
-Find the kind of an issue link with one command:
-
-```sh
-gh issue view <link> --json issueType,subIssuesSummary --jq '"\(.issueType.name) \(.subIssuesSummary.total)"'
-```
-
-If the link belongs to another skill, load that skill and stop this one.
-
 ## Before you start
 
 This skill needs the `taskrock` command-line tool, version 0.2.0, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.

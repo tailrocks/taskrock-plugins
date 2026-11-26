@@ -32,7 +32,7 @@ Use `taskrock-plan` to plan work. Use `taskrock-issue` to build one ready issue.
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.2.0, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
+This skill needs the `taskrock` command-line tool, version 0.2.1, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
 The input is the link of one issue, or the link of a delivery project. The status of each issue it triages is Triage.
 
 This skill changes GitHub. Step 5 edits the body, the routing fields and the status of an issue, can create sub-issues, posts comments and closes issues.
@@ -47,7 +47,7 @@ The skill never builds the issue and never merges.
 taskrock --version
 ```
 
-It must print `taskrock 0.2.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.2.0 or newer. Do not go on.
+It must print `taskrock 0.2.1` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.2.1 or newer. Do not go on.
 
 ### 1. Route the link
 

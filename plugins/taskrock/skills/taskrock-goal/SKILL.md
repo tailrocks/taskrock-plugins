@@ -34,7 +34,7 @@ Use `taskrock-issue` to build one task. Use `taskrock-plan` to plan work. A buil
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.2.0, on PATH. It also needs the `gh` command with a signed-in GitHub account.
+This skill needs the `taskrock` command-line tool, version 0.2.1, on PATH. It also needs the `gh` command with a signed-in GitHub account.
 Each runtime that a task names must be installed and signed in on this machine.
 The input is one link to an initiative, an epic, or a project.
 
@@ -49,7 +49,7 @@ It merges pull requests in step 6 and closes finished parents in step 7. It file
 taskrock --version
 ```
 
-It must print `taskrock 0.2.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.2.0 or newer. Do not go on.
+It must print `taskrock 0.2.1` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.2.1 or newer. Do not go on.
 
 Repeat steps 2 to 8 until a stop state in the Result section is true.
 

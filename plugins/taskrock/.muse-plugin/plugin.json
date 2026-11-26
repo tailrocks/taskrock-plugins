@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "taskrock",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Plan work on GitHub, build one planned issue, and manage a whole goal through review and merge with the taskrock command-line tool.",
   "displayName": "taskrock",
   "compat": {

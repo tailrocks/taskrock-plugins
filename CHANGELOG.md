@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- All skills need taskrock 0.3.0.
+- `taskrock-goal`: lists ready tasks with `taskrock ready --stacked`, takes a task whose blockers' pull requests are open with `taskrock claim --stacked`, merges a stack from the bottom up, and retargets each pull request to the default branch before its base merges.
+- `taskrock-issue`: checks a stacked claim, merges its base branch before the pull request, opens the pull request against the base branch, and merges the default branch after the base merged.
+- `taskrock-goal`, `taskrock-issue` and `taskrock-triage`: a blocked task waits until its blockers close, or until the manager takes it with `taskrock claim --stacked`.
+- `scripts/check.py` checks each flag that a skill passes to `taskrock`, allows `taskrock claim --stacked` only in `taskrock-goal`, refuses a switch to any branch other than `feat/issue-<number>`, and requires the stack rule in `taskrock-goal`.
+
 ## 0.2.1
 
 - All skills need taskrock 0.2.1.

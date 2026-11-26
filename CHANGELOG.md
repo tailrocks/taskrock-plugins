@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1
+
+- All skills need taskrock 0.2.1.
+- `taskrock-goal`: every issue it files (a follow-up, a Bug, a task for the owner, the retro) goes under the goal with the goal's milestone. It sweeps the Triage items under the goal before it stops, and says the work is done only when the goal's milestone has no open issue.
+- `taskrock-issue`: a friction Bug goes under the parent of the task, with the task's milestone.
+- `taskrock-plan`: every issue has a milestone, and the Done when of an initiative counts the Bugs filed while it is built.
+- `taskrock-goal`, `taskrock-issue` and `taskrock-triage`: no code is written for an issue that `taskrock claim` did not take, and an issue in Triage is never built.
+- Every skill and page names the skill to call, for example `/taskrock:taskrock-goal <link>`, instead of free text.
+- `scripts/check.py` fails when a skill routes a finding outside the goal, tells a person to type a build request without a skill name, or loses the claim rule or the title rule.
+
 ## 0.2.0
 
 - All skills need taskrock 0.2.0 and read the organization's `taskrock.toml`. No skill calls `gh issue create` or `gh issue edit --body`.

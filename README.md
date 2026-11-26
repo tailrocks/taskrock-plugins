@@ -27,6 +27,17 @@ The plugin `taskrock` for five agent CLIs: Claude Code, Codex, Grok Build, Muse 
 
 Call a skill with `/taskrock:taskrock-plan` in Claude Code, `$taskrock:taskrock-plan` in Codex, and `/taskrock-plan` in Grok Build, Muse Code and Antigravity. [docs/installation.md](docs/installation.md) has the tested versions, updates, removal, and how to remove the old plugin `tailrocks-taskrock-skills`.
 
+## Build planned work
+
+Always name the skill, so the agent does not pick another one.
+
+| Agent | One task | A whole initiative, epic or project |
+| --- | --- | --- |
+| Claude Code | `/taskrock:taskrock-issue <link>` | `/taskrock:taskrock-goal <link>`, or `/goal /taskrock:taskrock-goal <link>` |
+| Codex, Grok Build, Muse Code, Antigravity | "use the skill taskrock-issue with `<link>`" | "use the skill taskrock-goal with `<link>`" |
+
+`taskrock-goal` does not stop while an issue under the link is open or a Bug waits in Triage under it.
+
 ## Develop
 
 ```sh

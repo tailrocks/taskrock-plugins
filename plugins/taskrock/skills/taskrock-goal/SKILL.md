@@ -149,7 +149,7 @@ gh pr review <pull request> --comment --body-file <file>
 
 #### When no reviewer can run
 
-If the task's reviewer cannot run (the runtime is missing, signed out, or the model is refused), do not merge. Leave the pull request open, do not use another reviewer, and tell the user which pull request waits and why.
+If the task's reviewer cannot run (the runtime is missing, signed out, or the model is refused), do not merge. Leave the pull request open, do not use another reviewer, and tell the user which pull request waits and why. Also give back each open task stacked on this task, with "Give back the tasks stacked on a task" below: its note says that the base waits on a reviewer.
 
 #### Route each finding of a FAIL verdict
 
@@ -276,6 +276,23 @@ taskrock release <task link> --note <file>
 ```
 
 3. File a task for the owner with "File an issue" below, with the task as the source of "Where a filed issue goes" below. Make it block the task.
+4. Give back each open task stacked on this task, with "Give back the tasks stacked on a task" below: its note says that the base waits on the owner.
+
+### Give back the tasks stacked on a task
+
+A task stacked on a base that cannot finish in this run stays In Progress and keeps the run from stopping. Find each open pull request based on the branch of the task:
+
+```sh
+gh pr list --base feat/issue-<number of the task> --state open --json number,headRefName
+```
+
+The `headRefName` of each, `feat/issue-<m>`, names the stacked task `#<m>`. Write a note file with the four sections of "Hand a task to the user", where `Next step` says to claim the task again after its base is settled, and release it:
+
+```sh
+taskrock release <link of the stacked task> --note <file>
+```
+
+Then do the same for each task stacked on a task that you gave back, until `gh pr list` prints none.
 
 ### Where a filed issue goes
 
@@ -420,7 +437,7 @@ Stop in one of these states:
   An open issue that a check finds is work: attach it under the link, triage or build it, and go to step 2. Only then say that the work is done.
 - `ready` is empty, nothing is in progress, and the only open tasks wait on the owner: print the `waiting_on_owner` list and stop.
 - `ready` is empty, nothing is in progress, and the only Triage items under the link are the ones that `taskrock-triage` left as Needs information: print each link with its `Still needed` list, say that the reporter must answer, and stop.
-- `ready` is empty, and the only tasks in progress have a pull request that waits for a reviewer that could not run: print each pull request and the reason, and stop.
+- `ready` is empty, and the only tasks in progress have a pull request that waits for a reviewer that could not run: print each pull request and the reason, print each task that you gave back because it was stacked on it, and stop.
 
 ## Completion checks
 

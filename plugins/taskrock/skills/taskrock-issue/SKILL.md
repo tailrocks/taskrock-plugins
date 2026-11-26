@@ -79,6 +79,20 @@ gh api repos/<owner>/<repo>/branches/feat/issue-<number> --jq .name
 
 The line of the delivery project must say `In Progress`, and the second command must print `feat/issue-<number>`. When either differs, write no code and stop: say that the task is not claimed.
 
+Then find out whether the manager stacked the task on the branch of a blocker:
+
+```sh
+gh api repos/<owner>/<repo>/issues/<number>/comments --paginate --jq '.[].body | capture("<!-- taskrock:stacked-on (?<base>feat/issue-[0-9]+) -->") | .base'
+```
+
+When it prints nothing, the task starts from the default branch. When it prints a branch, the task is stacked: the last line is its base, `feat/issue-<base>`. Check the pull request of the base:
+
+```sh
+gh pr list --repo <owner>/<repo> --head feat/issue-<base> --state all --json state --jq '.[0].state'
+```
+
+It must print `OPEN` or `MERGED`. When it prints anything else, write no code and stop: say that the base of the stacked task is gone.
+
 Otherwise claim it:
 
 ```sh
@@ -119,11 +133,18 @@ Run every command under `Done when`. Keep each command and the output you saw. A
 
 ### 7. Merge the default branch
 
-Other tasks may have merged while you built. Bring their work in, then prove again.
+Other tasks may have merged while you built. Bring their work in, then prove again. A task that is not stacked, or whose base pull request prints `MERGED` now, merges the default branch:
 
 ```sh
 git fetch origin
 git merge origin/<default branch>
+```
+
+A stacked task whose base pull request still prints `OPEN` merges its base instead, so the review fixes of the blocker are in. Run the check of the base pull request of step 3 again first: it may have merged while you built.
+
+```sh
+git fetch origin
+git merge origin/feat/issue-<base>
 ```
 
 Fix any conflict. Then run every command under `Done when` again and keep the new output. Open the pull request only after every box passes on the merged branch.
@@ -144,10 +165,25 @@ Closes #<number>
 `Proof` holds each `Done when` command with its output from step 7. `Done when` repeats the checklist with every box ticked.
 
 ```sh
-GH_PR_CREATE_DRAFT=0 gh pr create --base <default branch> --head feat/issue-<number> --title "<type>: <summary>" --body-file <file>
+GH_PR_CREATE_DRAFT=0 gh pr create --base <base branch> --head feat/issue-<number> --title "<type>: <summary>" --body-file <file>
 ```
 
+`<base branch>` is `feat/issue-<base>` for a stacked task whose base pull request still prints `OPEN`, and the default branch for any other task.
+
 The title follows Conventional Commits.
+
+### When the base of a stacked task merged
+
+The manager hands you the task again after the base merged and it retargeted your pull request to the default branch. Bring the default branch in, prove again and push:
+
+```sh
+git fetch origin
+git switch feat/issue-<number>
+git merge origin/<default branch>
+git push origin feat/issue-<number>
+```
+
+Run every command under `Done when` again before the push. Write the new output into `Proof` of the pull request body with `gh pr edit <pull request> --body-file <file>`. The last line of your report is `DONE <pull request link>`.
 
 ### When you stop before the pull request
 
@@ -217,6 +253,7 @@ Make sure that each item is true:
 - `taskrock claim` exited with status 0, or the manager had taken the task for you.
 - You wrote code only after taskrock claim exited with 0, or after the manager told you that it took the task for you.
 - You merged the default branch into the task branch and ran every command under `Done when` again, and saw its result yourself.
+- For a stacked task, you merged `origin/feat/issue-<base>` while its base pull request was open, or the default branch after it merged, and the base of the pull request was `feat/issue-<base>` or the default branch.
 - The pull request body has the sections `Why`, `What`, `Proof`, and `Done when`, and the line `Closes #<number>`.
 - When you stopped before the pull request, the note has the sections `Done`, `Verified`, `State` and `Next step`, and `taskrock release <link> --note <file>` ran.
 - When you filed a friction Bug, it has the parent and the milestone of your task, and your report names its link.

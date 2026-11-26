@@ -227,11 +227,9 @@ def title_rule() -> None:
 
 
 def branches() -> None:
-    """Only `taskrock claim` creates a branch. A line with `git -C` works in another repository."""
+    """Only `taskrock claim` creates a branch."""
     for path in sorted(SKILLS.glob("*/SKILL.md")):
         for number, line in enumerate(path.read_text().splitlines(), 1):
-            if "git -C" in line:
-                continue
             if NEW_BRANCH.search(line):
                 problem(path, f"line {number} creates a branch. Work only on feat/issue-<number>, which taskrock claim creates")
             if "git worktree add" in line and "feat/issue-<number>" not in line:

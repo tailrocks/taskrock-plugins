@@ -1,6 +1,6 @@
 interface:
   display_name: "Taskrock: Goal"
-  short_description: "Build, review, and merge everything under a GitHub link"
+  short_description: "Build, review, and merge everything under a project, initiative, or epic link"
   default_prompt: "Use $taskrock-goal to implement this initiative, epic, or project link."
 policy:
   allow_implicit_invocation: true

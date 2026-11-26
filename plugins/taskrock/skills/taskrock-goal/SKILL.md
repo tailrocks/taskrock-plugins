@@ -1,7 +1,7 @@
 ---
 name: taskrock-goal
 description: >-
-  Manage the build of work that was planned with taskrock. Hand each ready task to a builder, have it reviewed, merge it, and repeat until everything under a GitHub link is done. Use when the user says "Implement" with the link of an initiative, an epic or a project. Do not use it for one issue or to plan work: use taskrock-issue or taskrock-plan.
+  Manage the build of everything under a taskrock link: a project, an Initiative, an Epic or any issue with sub-issues. Hand each ready task to a builder, review it, merge it, repeat. Use for Implement <link> and for /goal with such a link. For one Task, Bug or Feature use taskrock-issue.
 license: Apache-2.0
 ---
 
@@ -27,9 +27,9 @@ If the link belongs to another skill, load that skill and stop this one.
 
 You are the manager. You do not write the code of a task yourself. You hand tasks out, check the results and merge.
 
-The user's request to implement the link is also the request to merge every pull request under it that passes the gate in step 5. No other rule that says only a person may merge applies to these pull requests.
+The user's request to implement the link is also the request to merge every pull request under it that passes the gate in step 6. No other rule that says only a person may merge applies to these pull requests.
 
-Use this skill when the user asks you to implement the link of an initiative, an epic, or a project that taskrock planned.
+Use this skill when the user asks you to implement the link of a project, an initiative, an epic, or any issue with sub-issues that taskrock planned.
 Use `taskrock-issue` to build one task. Use `taskrock-plan` to plan work. A builder that you start uses `taskrock-issue`.
 
 ## Before you start
@@ -39,7 +39,7 @@ Each runtime that a task names must be installed and signed in on this machine.
 The input is one link to an initiative, an epic, or a project.
 
 This skill changes GitHub and starts other agent sessions. It claims and releases tasks, and it posts review comments.
-It merges pull requests in step 5 and closes finished parents in step 6. It can create a task for the owner.
+It merges pull requests in step 6 and closes finished parents in step 7. It files tasks for the owner and Bugs for triage with `taskrock apply`, and it appends to the body of a parent with `taskrock edit`.
 
 ## Procedure
 
@@ -51,9 +51,19 @@ taskrock --version
 
 It must print `taskrock 0.2.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.2.0 or newer. Do not go on.
 
-Repeat steps 1 to 7 until a stop state in the Result section is true.
+Repeat steps 2 to 8 until a stop state in the Result section is true.
 
-### 1. Ask what is ready
+### 1. Check the link
+
+When the link is a project link, go to step 2. When it is an issue link, run the command of the routing table:
+
+```sh
+gh issue view <link> --json issueType,subIssuesSummary --jq '"\(.issueType.name) \(.subIssuesSummary.total)"'
+```
+
+If the table sends this link to another skill, load that skill and stop this one.
+
+### 2. Ask what is ready
 
 ```sh
 taskrock ready <link> --json
@@ -61,7 +71,12 @@ taskrock ready <link> --json
 
 `ready` lists the tasks to hand out, each with who builds and who reviews. `problems` lists what is wrong with the plan. Fix a problem you can fix. Tell the user about the others.
 
-### 2. Take each ready task
+A problem that says `<url> breaks the <type> format: <message>` means the body of that issue lacks a section:
+
+- A Bug or a Feature: load the skill `taskrock-triage` with that issue, then go on with the other ready tasks.
+- A Task: file a task for the owner with "File an issue" below. It names the task and the broken section.
+
+### 3. Take each ready task
 
 ```sh
 taskrock claim <task link>
@@ -69,7 +84,7 @@ taskrock claim <task link>
 
 Exit status 3 means another agent has it. Skip that task. There is no limit on how many tasks run at the same time.
 
-### 3. Start a builder for each task you took
+### 4. Start a builder for each task you took
 
 The builder gets the task link, the sentence "The task is already taken for you", and the skill `taskrock-issue`.
 
@@ -90,7 +105,7 @@ The builder gets the task link, the sentence "The task is already taken for you"
 
 Only the `muse` line was run in a test. Check another line with the `--help` of that CLI before its first use.
 
-### 4. Review each pull request
+### 5. Review each pull request
 
 Wait for the checks:
 
@@ -102,20 +117,37 @@ Then start the reviewer the task names: Review runtime, Review model, Review eff
 
 1. Runs every command under `Done when` again itself. It does not trust the output in the pull request.
 2. Reads the change with `gh pr diff <pull request>` against the task.
-3. Answers PASS or FAIL, with its findings.
+3. Reproduces each problem it finds with a command. A finding that it did not reproduce does not count: it is left out of the verdict. Each finding that counts holds its command and the output.
+4. Answers PASS or FAIL, with its findings, and the commit it checked:
 
-You post the verdict. The first line is `VERDICT: PASS` or `VERDICT: FAIL`:
+```sh
+gh pr view <pull request> --json headRefOid --jq .headRefOid
+```
+
+You post the verdict. The comment ends with `VERDICT: PASS head=<sha>` or `VERDICT: FAIL head=<sha>`, where `<sha>` is the commit the reviewer checked:
 
 ```sh
 gh pr review <pull request> --comment --body-file <file>
 ```
 
-### 5. Merge only through this gate
+#### When no reviewer can run
+
+If the task's reviewer cannot run (the runtime is missing, signed out, or the model is refused), do not merge. Leave the pull request open, do not use another reviewer, and tell the user which pull request waits and why.
+
+#### Route each finding of a FAIL verdict
+
+Send each finding that counts one of three ways:
+
+- Fix: the builder fixes it. See "When the review fails".
+- Decision: the finding needs a choice that only the owner can make. File a task for the owner with "File an issue" below, and make it block this task.
+- Defer: the finding is real but outside this task. File a Bug with "File an issue" below. It starts in Triage. Do not make this task wait for it.
+
+### 6. Merge only through this gate
 
 All three must be true:
 
 - Every check passed.
-- The newest verdict is `VERDICT: PASS`, and it was posted after the last push.
+- The newest verdict is `VERDICT: PASS head=<sha>`, and `<sha>` equals the head commit of the pull request.
 - The body of the pull request has `Closes #<number of the task>`.
 
 ```sh
@@ -123,9 +155,23 @@ gh pr view <pull request> --json headRefOid --jq .headRefOid
 gh pr merge <pull request> --squash --match-head-commit <that value>
 ```
 
-### 6. Close finished parents
+A push after the verdict changes the head commit. Review again.
 
-GitHub does not close a parent when its last child closes. After each merge, look at the parent of the task, then at its parent, and so on:
+### 7. Record the decision and close finished parents
+
+After each merge, add one line to the parent of the task. Read its body into a file:
+
+```sh
+gh issue view <parent link> --json body --jq .body > <file>
+```
+
+Append the line `- <title of the task>: <link of the pull request>` under the heading `## Decisions so far`. When the body has no such heading, add `## Decisions so far` at the end of the body first. Then write the body back:
+
+```sh
+taskrock edit <parent link> <file>
+```
+
+GitHub does not close a parent when its last child closes. Look at the parent of the task, then at its parent, and so on:
 
 ```sh
 gh api repos/<owner>/<repo>/issues/<parent>/sub_issues --jq '[.[] | select(.state == "open")] | length'
@@ -134,52 +180,100 @@ gh issue close <parent link>
 
 Close the parent only when the first command prints `0`.
 
-### 7. Go to step 1
+When the parent that you closed is an Epic, write the retro. File a task for the owner with "File an issue" below, under the initiative that holds the epic (the parent of the epic). Its Question asks whether to make the edits to `AGENTS.md` that you propose. Its body lists each finding that appeared in two or more FAIL verdicts of the tasks of this epic, and the edit to `AGENTS.md` that would stop each one. A finding that appeared once is not listed.
+
+### 8. Go to step 2
 
 ### When the review fails
 
-Give the findings to a new builder on the same branch. Review again. Repeat while each round fixes something.
+Give the findings that you routed as fix to a new builder on the same branch. Review again.
 
-Stop the rounds when the reviewer repeats a finding, or when the builder and the reviewer disagree. Then hand the task to the user:
+Read the number of rounds from the config of the organization:
 
-Print the empty body of a task for the owner:
+```sh
+gh api -H "Accept: application/vnd.github.raw+json" repos/<owner>/.github/contents/taskrock.toml
+```
+
+`review.max_rounds` is the number of FAIL verdicts that a task may collect. When the file or the key is missing, it is 3.
+
+Stop the rounds when the task has `review.max_rounds` FAIL verdicts, when the reviewer repeats a finding, or when the builder and the reviewer disagree. Then hand the task to the user with "Hand a task to the user".
+
+### Hand a task to the user
+
+1. Write a note file with these four sections, each with text:
+
+```text
+## Done
+
+## Verified
+
+## State
+
+## Next step
+```
+
+2. Give the task back with the note:
+
+```sh
+taskrock release <task link> --note <file>
+```
+
+3. File a task for the owner with "File an issue" below, with the parent of the task as its parent. Make it block the task.
+
+### File an issue
+
+Use this for a task for the owner, a Bug, and the retro. Every issue is made with `taskrock apply`.
+
+1. Print the empty body of the type. Use `owner` for a task for the owner:
 
 ```sh
 taskrock template owner --owner <owner>
+taskrock template Bug --owner <owner>
 ```
 
-Make a new folder outside the repository. Write `plan.toml` in it:
+2. Make a new folder outside the repository. Write `plan.toml` in it. The `id` is new for each filing, for example `goal-<task number>-<what>`:
 
 ```toml
-id = "goal-<task number>-decision"
+id = "goal-12-decision"
 repo = "<owner>/<repo>"
 project = "https://github.com/orgs/<owner>/projects/<number>"
 ```
 
-Write `O1.md` in it, with the front matter and then the body from `taskrock template owner --owner <owner>`, every section filled in:
+   The `project` is the delivery project that `taskrock ready` read.
+
+3. Write one file, `<key>.md`, with the front matter and then the body from step 1, every section filled in. A task for the owner:
 
 ```text
 +++
 key = "O1"
-title = "<what the user must decide or do>"
+title = "<what the owner must decide or do>"
 type = "Task"
 agent = "Owner"
 +++
 ```
 
-Then create the issue and attach it:
+A Bug has `type = "Bug"` and no routing key. Its `## How to reproduce` is the command of the reviewer and its failing output.
+
+4. Check and create it:
 
 ```sh
+taskrock check <folder>
 taskrock apply <folder>
-gh issue edit <new number> --repo <owner>/<repo> --parent <epic number>
+```
+
+`apply` prints `created #<number> <key> <title>`. A Bug is created in Triage.
+
+5. Attach it, when the case needs it. As a child of a parent, and as a blocker of a task:
+
+```sh
+gh issue edit <new number> --repo <owner>/<repo> --parent <parent number>
 gh issue edit <task number> --repo <owner>/<repo> --add-blocked-by <new number>
-taskrock release <task link>
 ```
 
 ### When a builder says the task is wrong
 
-- A fact changed, such as a file that moved: write the corrected body to a file and run `taskrock edit <task link> <file>` (add `--replan` when the task is In Progress), write a comment that says what you changed, and hand the task out again.
-- A decision is wrong or missing: hand the task to the user with the commands above. Never change a decision yourself.
+- A fact changed, such as a file that moved: write the corrected body to a file, run `taskrock edit <task link> <file> --replan`, write a comment that says what you changed, and hand the task out again.
+- A decision is wrong or missing: hand the task to the user with "Hand a task to the user". Never change a decision yourself.
 
 ### When a pull request is closed without a merge
 
@@ -201,12 +295,18 @@ Stop in one of these states:
 
 - `ready` is empty, nothing is in progress, and every issue under the link is closed: say that the work is done.
 - `ready` is empty, nothing is in progress, and the only open tasks wait on the owner: print the `waiting_on_owner` list and stop.
+- `ready` is empty, and the only tasks in progress have a pull request that waits for a reviewer that could not run: print each pull request and the reason, and stop.
 
 ## Completion checks
 
 Make sure that each item is true:
 
-- Each pull request that you merged passed the three conditions of step 5.
+- Each pull request that you merged passed the three conditions of step 6, and the `<sha>` of its verdict was the head commit.
+- You merged no pull request that had no reviewer.
+- Each finding that you routed was reproduced by the reviewer with a command.
+- You stopped a task after `review.max_rounds` FAIL verdicts and handed it to the user with a note.
+- You added a line to `## Decisions so far` of the parent of each merged task.
+- You wrote the retro task when you closed an Epic.
 - You closed a parent only after the sub-issue count printed `0`.
 - You released each task whose pull request closed without a merge.
 - You told the user about each problem that you could not fix.

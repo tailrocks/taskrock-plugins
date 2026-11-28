@@ -86,15 +86,30 @@ A problem that says `<url> breaks the <type> format: <message>` means the body o
 - A Bug or a Feature: load the skill `taskrock-triage` with that issue, then go on with the other ready tasks.
 - A Task: file a task for the owner with "File an issue" below. It names the task and the broken section.
 
-`loose` lists the loose items: each Task, Bug, Feature or Epic with no parent. It never lists an Initiative. `ready` fills `loose` only for an issue link whose issue has a milestone. For a project link it is empty, so run the sweep of step 8.1 in every round instead, for each milestone title of the tasks that you hand out.
+`loose` lists the loose items: each Task, Bug, Feature or Epic with no parent. It never lists an Initiative. `ready` fills `loose` only for an issue link whose issue has a milestone. For a project link it is empty.
 
-For an issue link, attach each loose item in every round, not only before the run stops: give it the parent that "Where a filed issue goes" gives. Attach it with this command, which changes no body:
+For a project link, run this sweep yourself in every round, before you attach anything. Its milestone titles are those of the tasks that you handed out so far and, in the first round, those of the tasks in `ready`. Read the milestone of a task with `gh issue view <task link> --json milestone --jq .milestone.title`. For each title, in each repository of the project (`repos` of its `[[project]]` block in `taskrock.toml`), list the open issues with their types, and read the parent of each:
+
+```sh
+gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number,title,issueType --jq '.[] | "\(.number) \(.issueType.name) \(.title)"'
+gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
+```
+
+The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Each such issue is a loose item, except an Initiative: an Initiative is the top of a plan and has no parent.
+
+Attach each loose item in every round, not only before the run stops: `loose` is the list for an issue link, and the sweep is the list for a project link. Give each the parent that "Where a filed issue goes" gives, with the loose issue as the source. Attach it with this command, which changes no body:
 
 ```sh
 gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
 ```
 
-Then load the skill `taskrock-triage` with each loose Bug or Feature whose Status is Triage now. A loose Task, and a loose Bug or Feature whose Status is Todo, is built as it is.
+Then load the skill `taskrock-triage` with each loose Bug or Feature that is in Triage now. For an issue link, that is a Bug or Feature whose number is also in the `triage` key of the same `taskrock ready` output. In the sweep of a project link, read its status and use it when the command prints `Triage`:
+
+```sh
+gh issue view <number> --repo <owner>/<repo> --json projectItems --jq '.projectItems[].status.name'
+```
+
+A loose Task, and a loose Bug or Feature whose status is not Triage, is built as it is.
 
 ### 3. Take each ready task
 
@@ -133,6 +148,10 @@ For a stacked task, the prompt adds one sentence: "It is stacked on feat/issue-<
 | `minimax` | `mcode exec --model <model> "<prompt>"` |
 
 Only the `muse` line was run in a test. Check another line with the `--help` of that CLI before its first use.
+
+#### When a builder reports
+
+A builder that could not file a Bug (its task has no parent, or its parent is full) puts the text of the Bug in its report. When a report holds such a text, file the Bug with "File an issue" below, with the task of that builder as the source of "Where a filed issue goes". Do this before step 5.
 
 ### 5. Review each pull request
 
@@ -195,13 +214,15 @@ gh pr view <pull request> --json headRefOid --jq .headRefOid
 gh api graphql -f query='query($o:String!,$r:String!,$b:String!){repository(owner:$o,name:$r){mergeQueue(branch:$b){id}}}' -f o=<owner> -f r=<repo> -f b=<default branch> --jq '.data.repository.mergeQueue.id'
 ```
 
-The query prints an id when the default branch has a merge queue, and an empty line when it has none. Then merge at once:
+The query prints an id when the default branch has a merge queue, and an empty line when it has none.
+
+When the query prints an empty line, merge at once:
 
 ```sh
 gh pr merge <pull request> --squash --match-head-commit <that value>
 ```
 
-When the query prints an id, the default branch has a merge queue. Enqueue the pull request with its head commit pinned, then poll until it is merged:
+When the query prints an id, the default branch has a merge queue. Only an id leads here. Enqueue the pull request with its head commit pinned, then poll until it is merged:
 
 ```sh
 gh pr view <pull request> --json id --jq .id
@@ -211,17 +232,17 @@ gh api graphql -f query='mutation($id:ID!,$h:GitObjectID!){enqueuePullRequest(in
 `gh pr view --json state` cannot tell a queued pull request from a dequeued one: both read `OPEN`. Poll the merge queue entry instead:
 
 ```sh
-gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){state mergeQueueEntry{state position}}}}' -f o=<owner> -f r=<repo> -F n=<number> --jq '.data.repository.pullRequest | "\(.state) \(.mergeQueueEntry.state // "none")"'
+gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){state mergeQueueEntry{state position}}}}' -f o=<owner> -f r=<repo> -F n=<pull request number> --jq '.data.repository.pullRequest | "\(.state) \(.mergeQueueEntry.state // "none")"'
 ```
 
 Read each poll:
 
 - `MERGED ...`: the pull request is merged. Go on to step 7.
-- `OPEN <entry state>`: it is still queued. Wait 60 seconds and poll again, for at most 60 polls.
-- `OPEN none`: after the enqueue, the queue removed the pull request, so it is not merged. Read why from the checks of the merge group: run `gh pr checks <pull request>`, then `gh run list --event merge_group --json databaseId,headBranch,conclusion --jq '.[] | select(.headBranch | startswith("gh-readonly-queue/<base>/pr-<number>-"))' | head -1` and `gh run view <databaseId> --log-failed` for that run. Handle the failure as a failed check, under "When the review fails".
+- `OPEN <entry state>`: it is still queued. Wait 60 seconds and poll again.
+- `OPEN none`: after the enqueue, the queue removed the pull request, so it is not merged. Read why from the checks of the merge group: run `gh pr checks <pull request>`, then `gh run list --event merge_group --limit 100 --json databaseId,headBranch,conclusion --jq '.[] | select(.conclusion == "failure" and (.headBranch | startswith("gh-readonly-queue/<default branch>/pr-<pull request number>-")))' | head -1` and `gh run view <databaseId> --log-failed` for that run. Handle the failure as a failed check, under "When the review fails".
 - `CLOSED ...`: someone closed the pull request without a merge. Stop polling, follow "When a pull request is closed without a merge", and tell the user.
 
-When 60 polls pass with no change, stop and tell the user which pull request waits in the queue.
+After 60 polls with no change, stop and tell the user which pull request waits in the queue.
 
 GitHub deletes the merged branch, and a pull request still based on a deleted branch is closed for good, so retarget first. After the merge, start a builder for the task of each pull request that you retargeted, on its routing, with the prompt "use the skill taskrock-issue with <task link>. The task is already taken for you. Its base merged: merge the default branch, run Done when again and push." Its head commit changes, so review it again with step 5 before it passes this gate.
 
@@ -256,21 +277,7 @@ When the parent that you closed is an Epic, write the retro. File a task for the
 
 Do this each time `ready` is empty and nothing is in progress.
 
-1. Give each loose item a parent. For an issue link, the key `loose` of `taskrock ready <link> --json` lists them. For a project link, `loose` is empty, so list the open issues of each milestone of the tasks that you hand out, in each repository of the project (`repos` of its `[[project]]` block in `taskrock.toml`), with their types, and read the parent of each:
-
-```sh
-gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number,title,issueType --jq '.[] | "\(.number) \(.issueType.name) \(.title)"'
-gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
-```
-
-   The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Attach each loose Task, Bug, Feature or Epic, and never an Initiative: an Initiative is the top of a plan and has no parent. The parent follows "Where a filed issue goes" below, with the loose issue as the source. Attach it with this command:
-
-```sh
-gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
-```
-
-   Then load the skill `taskrock-triage` with each loose Bug or Feature whose Status is Triage, as step 2 says.
-
+1. Give each loose item a parent. For an issue link, the key `loose` of `taskrock ready <link> --json` lists them. For a project link, run the same sweep as step 2. Attach each loose item and load the skill `taskrock-triage` as step 2 says, with the Triage test of step 2 for the kind of link.
 2. List the Triage items under the link:
 
 ```sh
@@ -364,22 +371,13 @@ gh issue view <parent link> --json issueType --jq .issueType.name
 gh api repos/<owner>/<repo>/issues/<parent number> --jq .sub_issues_summary.total
 ```
 
-When the parent has 100 sub-issues, file under a child Epic of it that has room: an Epic among its sub-issues whose count is below 100. List them with:
+When the parent from the parent rule has 100 sub-issues, file under a child Epic of it that has room: an Epic among its sub-issues whose count is below 100. List them with:
 
 ```sh
 gh api repos/<owner>/<repo>/issues/<parent number>/sub_issues --paginate --jq '.[] | select(.type.name == "Epic") | "\(.number) \(.sub_issues_summary.total)"'
 ```
 
-When the parent has no child Epic with room, file a new Epic in the same draft as the issue, with the Epic sections of `taskrock template Epic`. The Epic's `parent` is the link of the full parent, and the issue's `parent` is the key of that Epic. Give the Epic the title `<parent title>: issues filed while it is built`. `taskrock check` refuses an Epic with no children, so the Epic and the issue must go in one draft:
-
-```text
-+++
-key = "E1"
-title = "<parent title>: issues filed while it is built"
-type = "Epic"
-parent = "https://github.com/<owner>/<repo>/issues/<parent number>"
-+++
-```
+When it has no child Epic with room, take the next entry of the parent-rule list instead: the parent of that parent, and so on, up to the goal link. Run the count command on each entry, and file under the first one that has room. When the goal link itself is full, file nothing, tell the user, and go on. Never file a new Epic for this: the new Epic would itself be the 101st child, and `apply` refuses it.
 
 `apply` refuses a full parent before any `POST`, with this message: `<link> has <n> sub-issues and GitHub allows 100: file under a child Epic of it`.
 
@@ -506,6 +504,7 @@ Stop in one of these states:
 - `ready` is empty or lists only tasks of the run list, nothing is in progress, and the only open tasks wait on the owner: print the `waiting_on_owner` list and stop.
 - `ready` is empty, nothing is in progress, and the only Triage items under the link are the ones that `taskrock-triage` left as Needs information: print each link with its `Still needed` list, say that the reporter must answer, and stop.
 - `ready` is empty or lists only tasks of the run list, and the only tasks in progress have a pull request that waits for a reviewer that could not run: print each pull request and the reason, print each task of the run list, and stop.
+- A pull request waits in the merge queue and 60 polls of its queue entry show no change: print the pull request and say that it waits in the queue, and stop.
 
 ## Completion checks
 

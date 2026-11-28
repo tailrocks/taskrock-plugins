@@ -231,14 +231,14 @@ parent = "https://github.com/<owner>/<repo>/issues/<number>"
 
 A title starts with a capital letter, a digit or a code span in backticks. A lowercase letter is allowed only for the name of the repository, as in "taskrock 0.2.1: …".
 
-(c) Write `<folder>/plan.toml` as its own `toml` block, with `id`, `repo` and `project` only. Never put `parent` in `plan.toml`. The `project` is the delivery project of your task. Its title is in `gh issue view <link> --json projectItems`, and its URL is:
+(c) Write `<folder>/plan.toml` as its own `toml` block, with `id`, `repo` and `project` only. Never put `parent` in `plan.toml`. The `id` is new for each filing, `friction-<task number>-<what>`, where `<what>` is a short new word for this Bug, because `apply` skips a key that it has already created under that id. The `project` is the delivery project of your task. Its title is in `gh issue view <link> --json projectItems`, and its URL is:
 
 ```sh
 gh project list --owner <owner> --format json --jq '.projects[] | select(.title == "<project title>") | .url'
 ```
 
 ```toml
-id = "friction-<number>"
+id = "friction-<task number>-<what>"
 repo = "<owner>/<repo>"
 project = "https://github.com/orgs/<owner>/projects/<project number>"
 ```

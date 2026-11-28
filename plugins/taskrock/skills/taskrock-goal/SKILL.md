@@ -195,13 +195,15 @@ gh pr view <pull request> --json headRefOid --jq .headRefOid
 gh api graphql -f query='query($o:String!,$r:String!,$b:String!){repository(owner:$o,name:$r){mergeQueue(branch:$b){id}}}' -f o=<owner> -f r=<repo> -f b=<default branch> --jq '.data.repository.mergeQueue.id'
 ```
 
-The query prints an id when the default branch has a merge queue, and an empty line when it has none. Then merge at once:
+The query prints an id when the default branch has a merge queue, and an empty line when it has none.
+
+When the query prints an empty line, merge at once:
 
 ```sh
 gh pr merge <pull request> --squash --match-head-commit <that value>
 ```
 
-When the query prints an id, the default branch has a merge queue. Enqueue the pull request with its head commit pinned, then poll until it is merged:
+When the query prints an id, the default branch has a merge queue. Only an id leads here. Enqueue the pull request with its head commit pinned, then poll until it is merged:
 
 ```sh
 gh pr view <pull request> --json id --jq .id
@@ -211,17 +213,17 @@ gh api graphql -f query='mutation($id:ID!,$h:GitObjectID!){enqueuePullRequest(in
 `gh pr view --json state` cannot tell a queued pull request from a dequeued one: both read `OPEN`. Poll the merge queue entry instead:
 
 ```sh
-gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){state mergeQueueEntry{state position}}}}' -f o=<owner> -f r=<repo> -F n=<number> --jq '.data.repository.pullRequest | "\(.state) \(.mergeQueueEntry.state // "none")"'
+gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){state mergeQueueEntry{state position}}}}' -f o=<owner> -f r=<repo> -F n=<pull request number> --jq '.data.repository.pullRequest | "\(.state) \(.mergeQueueEntry.state // "none")"'
 ```
 
 Read each poll:
 
 - `MERGED ...`: the pull request is merged. Go on to step 7.
-- `OPEN <entry state>`: it is still queued. Wait 60 seconds and poll again, for at most 60 polls.
-- `OPEN none`: after the enqueue, the queue removed the pull request, so it is not merged. Read why from the checks of the merge group: run `gh pr checks <pull request>`, then `gh run list --event merge_group --json databaseId,headBranch,conclusion --jq '.[] | select(.headBranch | startswith("gh-readonly-queue/<base>/pr-<number>-"))' | head -1` and `gh run view <databaseId> --log-failed` for that run. Handle the failure as a failed check, under "When the review fails".
+- `OPEN <entry state>`: it is still queued. Wait 60 seconds and poll again.
+- `OPEN none`: after the enqueue, the queue removed the pull request, so it is not merged. Read why from the checks of the merge group: run `gh pr checks <pull request>`, then `gh run list --event merge_group --limit 100 --json databaseId,headBranch,conclusion --jq '.[] | select(.conclusion == "failure" and (.headBranch | startswith("gh-readonly-queue/<default branch>/pr-<pull request number>-")))' | head -1` and `gh run view <databaseId> --log-failed` for that run. Handle the failure as a failed check, under "When the review fails".
 - `CLOSED ...`: someone closed the pull request without a merge. Stop polling, follow "When a pull request is closed without a merge", and tell the user.
 
-When 60 polls pass with no change, stop and tell the user which pull request waits in the queue.
+After 60 polls with no change, stop and tell the user which pull request waits in the queue.
 
 GitHub deletes the merged branch, and a pull request still based on a deleted branch is closed for good, so retarget first. After the merge, start a builder for the task of each pull request that you retargeted, on its routing, with the prompt "use the skill taskrock-issue with <task link>. The task is already taken for you. Its base merged: merge the default branch, run Done when again and push." Its head commit changes, so review it again with step 5 before it passes this gate.
 
@@ -506,6 +508,7 @@ Stop in one of these states:
 - `ready` is empty or lists only tasks of the run list, nothing is in progress, and the only open tasks wait on the owner: print the `waiting_on_owner` list and stop.
 - `ready` is empty, nothing is in progress, and the only Triage items under the link are the ones that `taskrock-triage` left as Needs information: print each link with its `Still needed` list, say that the reporter must answer, and stop.
 - `ready` is empty or lists only tasks of the run list, and the only tasks in progress have a pull request that waits for a reviewer that could not run: print each pull request and the reason, print each task of the run list, and stop.
+- A pull request waits in the merge queue and 60 polls of its queue entry show no change: print the pull request and say that it waits in the queue, and stop.
 
 ## Completion checks
 

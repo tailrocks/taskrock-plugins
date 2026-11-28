@@ -6,7 +6,7 @@
 - `taskrock-issue`: a friction Bug gets the full link of the parent of the task as its `parent`, and `apply` gives it the milestone of that parent. When the task has no parent, or `apply` finds no milestone, the Bug stays in the final report.
 - `taskrock-triage`: a Feature split into sub-issues gets the full link of the Feature as each `parent`, and `apply` gives each sub-issue the milestone of the Feature.
 - `scripts/check.py`: fails on `gh issue edit --milestone` (also on a continuation line), on "leave out that line" in any case, on an example of an issue type with no `parent` that is a full link, and on a `taskrock-goal` whose step 2 does not name the key `loose`.
-- `taskrock-goal`: step 6 merges through the merge queue when the default branch has one, enqueuing the pull request with its head commit pinned by `expectedHeadOid`, and keeps `gh pr merge` when it has none; `scripts/check.py` requires `enqueuePullRequest` and `expectedHeadOid`.
+- `taskrock-goal`: step 6 merges through the merge queue when the default branch has one, enqueuing the pull request with its head commit pinned by `expectedHeadOid`, and keeps `gh pr merge` when it has none; `scripts/check.py` requires `enqueuePullRequest` and `expectedHeadOid`. The merge group run of a dequeued pull request is picked from the last 100 runs by its `failure` conclusion and its branch prefix, and a pull request that shows no change after 60 polls of its queue entry is a stop state of the Result section.
 
 ## 0.3.0
 

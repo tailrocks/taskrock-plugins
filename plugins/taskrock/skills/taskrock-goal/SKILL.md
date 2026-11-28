@@ -251,6 +251,9 @@ taskrock pr threads <pull request> --defer
 You post one verdict for the head. It ends with `VERDICT: PASS head=<sha>` only when each reviewer that ran passed. Otherwise it ends with `VERDICT: FAIL head=<sha>`. `<sha>` is the commit that the reviewers checked:
 
 ```markdown
+Reviewer: <review agent> on <review model> (<effort>)
+Reviewer: <security agent> on <security model> (<effort>)
+
 ## Code review
 
 ## Security review
@@ -260,7 +263,9 @@ You post one verdict for the head. It ends with `VERDICT: PASS head=<sha>` only 
 VERDICT: PASS head=<sha>
 ```
 
-`Security review` is there only when the security reviewer ran. `Non-blocking` is there only in a PASS, and lists P3 findings only.
+Near the top, each reviewer that ran has one line that starts with `Reviewer:`: the first line is the code reviewer, with its Review agent, Review model and Review effort, and the second line is the security reviewer, with the name of its `routing.subagent` entry and the model and effort that it ran on. taskrock counts a verdict only when the body has a line that starts with `Reviewer:`. `Security review` and its `Reviewer:` line are there only when the security reviewer ran. `Non-blocking` is there only in a PASS, and lists P3 findings only.
+
+Post the verdict as a pull request review, never as an issue comment with `gh pr comment`, because taskrock counts a verdict only from a pull request review:
 
 ```sh
 gh pr review <pull request> --comment --body-file <file>

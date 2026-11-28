@@ -323,6 +323,8 @@ GOAL_MUST_NAME = [
     "P3",
     "gh pr update-branch",
 ]
+VERDICT_LINE = "Reviewer: <review agent> on <review model> (<effort>)"
+VERDICT_POST = "gh pr review <pull request> --comment --body-file <file>"
 QUEUE_POLL = "On exit 10 with `queued`, run `taskrock pr status <pull request>` every 5 minutes"
 GOAL_MUST_NOT_NAME = {
     "gh pr merge": "merges through `taskrock pr merge`, which retargets, queues and pins the head commit",
@@ -341,6 +343,12 @@ def merge_rule() -> None:
     for word, why in GOAL_MUST_NOT_NAME.items():
         if word in text:
             problem(path, f"names `{word}`: {why}")
+    if VERDICT_LINE not in text:
+        problem(path, f"does not put `{VERDICT_LINE}` in the verdict. taskrock counts a verdict only when its body has a line that starts with `Reviewer:`")
+    if VERDICT_POST not in text:
+        problem(path, f"does not post the verdict with `{VERDICT_POST}`. taskrock counts a verdict only from a pull request review")
+    if any("gh pr comment" in block for block in re.findall(r"```sh\n(.*?)```", text, re.S)):
+        problem(path, "runs `gh pr comment`. A verdict is a pull request review, and taskrock ignores an issue comment")
     if QUEUE_POLL not in text:
         problem(path, f"does not state the queue poll: {QUEUE_POLL}. A queued pull request needs it to reach MERGED")
 

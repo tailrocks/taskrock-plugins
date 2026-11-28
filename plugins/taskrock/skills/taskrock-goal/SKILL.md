@@ -221,19 +221,19 @@ gh pr view <pull request> --json headRefOid --jq .headRefOid
 gh api graphql -f query='query($o:String!,$r:String!,$b:String!){repository(owner:$o,name:$r){mergeQueue(branch:$b){id}}}' -f o=<owner> -f r=<repo> -f b=<default branch> --jq '.data.repository.mergeQueue.id'
 ```
 
-The query prints an id when the default branch has a merge queue, and an empty line when it has none.
+The first command prints the head commit of the pull request: it is `<head commit>` below. The query prints an id when the default branch has a merge queue, and an empty line when it has none.
 
 When the query prints an empty line, merge at once:
 
 ```sh
-gh pr merge <pull request> --squash --match-head-commit <that value>
+gh pr merge <pull request> --squash --match-head-commit <head commit>
 ```
 
 When the query prints an id, the default branch has a merge queue. Only an id leads here. Enqueue the pull request with its head commit pinned, then poll until it is merged:
 
 ```sh
 gh pr view <pull request> --json id --jq .id
-gh api graphql -f query='mutation($id:ID!,$h:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$h}){mergeQueueEntry{position state}}}' -f id=<node id> -f h=<that value>
+gh api graphql -f query='mutation($id:ID!,$h:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$h}){mergeQueueEntry{position state}}}' -f id=<node id> -f h=<head commit>
 ```
 
 `gh pr view --json state` cannot tell a queued pull request from a dequeued one: both read `OPEN`. Poll the merge queue entry instead:
@@ -246,7 +246,7 @@ Read each poll:
 
 - `MERGED ...`: the pull request is merged. Go on to step 7.
 - `OPEN <entry state>`: it is still queued. Wait 60 seconds and poll again.
-- `OPEN none`: after the enqueue, the queue removed the pull request, so it is not merged. Read why from the checks of the merge group: run `gh pr checks <pull request>`, then `gh run list --event merge_group --limit 100 --json databaseId,headBranch,conclusion --jq '.[] | select(.conclusion == "failure" and (.headBranch | startswith("gh-readonly-queue/<default branch>/pr-<pull request number>-")))' | head -1` and `gh run view <databaseId> --log-failed` for that run. Handle the failure as a failed check, under "When the review fails".
+- `OPEN none`: after the enqueue, the queue removed the pull request, so it is not merged. Read why from the checks of the merge group: run `gh pr checks <pull request>`, then `gh run list --event merge_group --limit 100 --json databaseId,headBranch,conclusion --jq '.[] | select(.conclusion != "success" and (.headBranch | startswith("gh-readonly-queue/<default branch>/pr-<pull request number>-")))' | head -1` and `gh run view <databaseId> --log-failed` for that run. The filter `!= "success"` keeps a run that failed, was cancelled or timed out. When the lookup prints nothing, read the timeline of the pull request: `gh api repos/<owner>/<repo>/issues/<pull request number>/timeline --jq '.[] | select(.event | test("merge_queue")) | "\(.created_at) \(.event) \(.actor.login)"'` prints each `added_to_merge_queue` and `removed_from_merge_queue` event with its time and its actor. Handle the result as a failed check, under "When the review fails".
 - `CLOSED ...`: someone closed the pull request without a merge. Stop polling, follow "When a pull request is closed without a merge", and tell the user.
 
 After 60 polls with no change, stop and tell the user which pull request waits in the queue.
@@ -411,7 +411,7 @@ taskrock template Task --owner <owner>
 ```toml
 id = "goal-12-decision"
 repo = "<owner>/<repo>"
-project = "https://github.com/orgs/<owner>/projects/<number>"
+project = "https://github.com/orgs/<owner>/projects/<project number>"
 ```
 
    The `project` is the delivery project that `taskrock ready` read.

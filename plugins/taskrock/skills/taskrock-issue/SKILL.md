@@ -31,7 +31,7 @@ Use this skill when the user gives you the link of one issue of type Task, Bug o
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.5.0, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
+This skill needs the `taskrock` command-line tool, version 0.5.2, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
 The input is one issue link. The issue holds the Steps, the Done when list, and the Out of scope list.
 
 This skill changes GitHub. Step 3 takes the task for you. Step 5 pushes commits to the task branch. Step 8 opens a draft pull request. Step 9 marks it ready.
@@ -45,7 +45,7 @@ The skill never merges. The manager merges.
 taskrock --version
 ```
 
-It must print `taskrock 0.5.` followed by a patch number, such as `taskrock 0.5.0`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.5.0. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
+It must print `taskrock 0.5.` followed by a patch number of 2 or more, such as `taskrock 0.5.2`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.5.2. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
 
 ### 1. Route
 
@@ -253,7 +253,20 @@ The manager hands you the task again after the base merged and it retargeted you
    ```
 
 4. Write the new output into `Proof` of the pull request body, and set it with `gh pr edit <pull request> --body-file <file>`.
-5. Do step 9 again: it runs `taskrock pr status <pull request>`, fixes each `builder` finding except `draft`, and runs `gh pr ready <pull request>` once.
+5. Read the state of the pull request:
+
+   ```sh
+   taskrock pr status <pull request>
+   ```
+
+   Fix every finding whose owner is `builder`, except `draft`, as step 9 says, and run the command again after each fix. Go on when no `builder` finding is left except `draft`.
+6. Mark the pull request ready, once:
+
+   ```sh
+   gh pr ready <pull request>
+   ```
+
+   Then run `taskrock pr status <pull request>` once more and end the report as step 9 says.
 
 ### When you stop before the pull request
 

@@ -405,7 +405,7 @@ def title_rule() -> None:
 VERSION_SKILLS = ["taskrock-goal", "taskrock-issue", "taskrock-plan", "taskrock-setup", "taskrock-triage"]
 # The first patch release of a minor that a skill needs, keyed by that minor and the skill. A skill and
 # minor not listed accept patch 0, so a new minor starts with no floor.
-VERSION_FLOORS = {("0.5", "taskrock-goal"): 2}
+VERSION_FLOORS = {("0.5", "taskrock-goal"): 2, ("0.5", "taskrock-issue"): 2}
 VERSION_GATE = (
     "It must print `taskrock {minor}.` followed by a patch number{at_least}, such as `taskrock {first}`. "
     "If the command is missing or prints an older version, stop and tell the user to install taskrock {first}. "

@@ -328,8 +328,8 @@ def title_rule() -> None:
 
 VERSION_SKILLS = ["taskrock-goal", "taskrock-issue", "taskrock-plan", "taskrock-setup", "taskrock-triage"]
 VERSION_GATE = (
-    "It must print `taskrock {minor}.` followed by a patch number, such as `taskrock {version}`. "
-    "If the command is missing or prints an older version, stop and tell the user to install taskrock {version}. "
+    "It must print `taskrock {minor}.` followed by a patch number, such as `taskrock {minor}.0`. "
+    "If the command is missing or prints an older version, stop and tell the user to install taskrock {minor}.0. "
     "If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user "
     "to update the plugin with `claude plugin marketplace update taskrock`, then "
     "`claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the "
@@ -337,13 +337,30 @@ VERSION_GATE = (
 )
 
 
+VERSION_MENTIONS = [
+    re.compile(r"version (\d+\.\d+)\.\d+, on PATH"),
+    re.compile(r"--tag v(\d+\.\d+)\.\d+"),
+    re.compile(r"taskrock (\d+\.\d+)\.(?!\d)"),
+]
+
+
 def version_gate(version: str) -> None:
-    """Each version skill runs `taskrock --version` and accepts only the minor version of VERSION."""
+    """Each version skill runs `taskrock --version` and names only the major.minor of VERSION.
+
+    A plugin patch release changes no skill text. The title-rule example `taskrock 0.2.1: ...` is not
+    a version mention: no pattern above matches it.
+    """
     minor = ".".join(version.split(".")[:2])
-    gate = VERSION_GATE.format(minor=minor, version=version)
+    gate = VERSION_GATE.format(minor=minor)
     for name in VERSION_SKILLS:
         path = SKILLS / name / "SKILL.md"
         text = path.read_text()
+        if not VERSION_MENTIONS[0].search(text):
+            problem(path, "does not say `version X.Y.Z, on PATH`")
+        for mention in VERSION_MENTIONS:
+            for found in mention.findall(text):
+                if found != minor:
+                    problem(path, f"names taskrock {found}, but VERSION is {version}: name {minor}")
         if "taskrock --version" not in text:
             problem(path, "does not run `taskrock --version`")
         if gate not in text:

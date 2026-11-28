@@ -3,7 +3,7 @@
 ## 0.4.0
 
 - All skills need taskrock 0.4.0.
-- Every skill that runs `taskrock --version` accepts only taskrock 0.4.x. On a newer minor or major version it stops and tells the user to update the plugin. `scripts/check.py` requires that stop text.
+- Every skill that runs `taskrock --version` accepts only taskrock 0.4.x. On a newer minor or major version it stops and tells the user to update the plugin. `scripts/check.py` requires that stop text, and fails when a skill names another major.minor than `VERSION` in its "version X.Y.Z, on PATH" line, in `--tag vX.Y.Z` or in `taskrock X.Y.`. A plugin patch release changes no skill text.
 - `taskrock-goal`: attaches each loose Task, Bug, Feature or Epic in every round: from the key `loose` of `taskrock ready --json` for an issue link, and from the milestone sweep for a project link. A loose Bug or Feature is triaged. A filed issue gets its parent by the parent rule, under a child Epic when its parent has 100 sub-issues, and `apply` sets the milestone of that parent. A missing milestone stops the filing and is reported. No step sets a milestone with `gh issue edit`.
 - `taskrock-issue`: a friction Bug gets the full link of the parent of the task as its `parent`, and `apply` gives it the milestone of that parent. When the task has no parent, or `apply` finds no milestone, the Bug stays in the final report.
 - `taskrock-triage`: a Feature split into sub-issues gets the full link of the Feature as each `parent`, and `apply` gives each sub-issue the milestone of the Feature.

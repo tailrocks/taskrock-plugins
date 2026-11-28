@@ -323,6 +323,7 @@ GOAL_MUST_NAME = [
     "P3",
     "gh pr update-branch",
 ]
+QUEUE_POLL = "On exit 10 with `queued`, run `taskrock pr status <pull request>` every 5 minutes"
 GOAL_MUST_NOT_NAME = {
     "gh pr merge": "merges through `taskrock pr merge`, which retargets, queues and pins the head commit",
     "@codex review": "Codex reviews when the builder marks the pull request ready, so no comment starts it",
@@ -340,6 +341,30 @@ def merge_rule() -> None:
     for word, why in GOAL_MUST_NOT_NAME.items():
         if word in text:
             problem(path, f"names `{word}`: {why}")
+    if QUEUE_POLL not in text:
+        problem(path, f"does not state the queue poll: {QUEUE_POLL}. A queued pull request needs it to reach MERGED")
+
+
+NEGATED_DEFER = re.compile(r"(?:never|not|no|cannot)\s+(?:be\s+)?$", re.I)
+MEDIUM = re.compile(r"\bmedium\b|\bP2\b", re.I)
+DEFER_WORD = re.compile(r"\bdefer\w*", re.I)
+
+
+def medium_deferral() -> None:
+    """No skill lets a medium (P2) finding be deferred. Only a P3 finding may be."""
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        for sentence in sentences(path.read_text()):
+            flat = MARKUP.sub("", sentence)
+            if not MEDIUM.search(flat):
+                continue
+            for word in DEFER_WORD.finditer(flat):
+                if not NEGATED_DEFER.search(flat[: word.start()]):
+                    problem(
+                        path,
+                        f"defers a medium finding: `{flat.strip()[:100]}`. A reproduced P0, P1 or P2 finding blocks "
+                        "and is never deferred: only a P3 finding may be deferred",
+                    )
+                    break
 
 
 def title_rule() -> None:
@@ -350,9 +375,11 @@ def title_rule() -> None:
 
 
 VERSION_SKILLS = ["taskrock-goal", "taskrock-issue", "taskrock-plan", "taskrock-setup", "taskrock-triage"]
+# The first patch release of the minor that a skill needs. A skill not listed accepts patch 0.
+VERSION_FLOORS = {"taskrock-goal": 1}
 VERSION_GATE = (
-    "It must print `taskrock {minor}.` followed by a patch number, such as `taskrock {minor}.0`. "
-    "If the command is missing or prints an older version, stop and tell the user to install taskrock {minor}.0. "
+    "It must print `taskrock {minor}.` followed by a patch number{at_least}, such as `taskrock {first}`. "
+    "If the command is missing or prints an older version, stop and tell the user to install taskrock {first}. "
     "If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user "
     "to update the plugin with `claude plugin marketplace update taskrock`, then "
     "`claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the "
@@ -379,24 +406,27 @@ def mentioned_versions(path: Path, text: str, minor: str, version: str) -> None:
 def version_gate(version: str) -> None:
     """Each version skill runs `taskrock --version` and names only the major.minor of VERSION.
 
-    A plugin patch release changes no skill text. Every mention of a full `taskrock X.Y.Z` in a skill, the
-    README or the installation page names that major.minor too. The title-rule example is not a version
-    mention: it is cut out before the patterns run.
+    A plugin patch release changes no skill text, except that a skill in VERSION_FLOORS needs a tool patch
+    release: its gate and its "version X.Y.Z, on PATH" line name that floor. Every mention of a full
+    `taskrock X.Y.Z` in a skill, the README or the installation page names that major.minor too. The
+    title-rule example is not a version mention: it is cut out before the patterns run.
     """
     minor = ".".join(version.split(".")[:2])
-    gate = VERSION_GATE.format(minor=minor)
     for path in VERSION_PAGES:
         mentioned_versions(path, path.read_text(), minor, version)
     for name in VERSION_SKILLS:
         path = SKILLS / name / "SKILL.md"
         text = path.read_text()
+        floor = VERSION_FLOORS.get(name, 0)
+        first = f"{minor}.{floor}"
+        gate = VERSION_GATE.format(minor=minor, first=first, at_least=f" of {floor} or more" if floor else "")
         mentioned_versions(path, text, minor, version)
-        if not VERSION_MENTIONS[0].search(text):
-            problem(path, "does not say `version X.Y.Z, on PATH`")
+        if f"version {first}, on PATH" not in text:
+            problem(path, f"does not say `version {first}, on PATH`")
         if "taskrock --version" not in text:
             problem(path, "does not run `taskrock --version`")
         if gate not in text:
-            problem(path, f"does not state the version gate: accept only taskrock {minor}.x, and tell the user to update the plugin on a newer minor or major version")
+            problem(path, f"does not state the version gate: accept only taskrock {first} or a later {minor} patch release, and tell the user to update the plugin on a newer minor or major version")
 
 
 SWITCH = re.compile(r"git (?:switch|checkout|worktree add)\b")
@@ -439,6 +469,7 @@ def main() -> int:
     stacked_claims()
     stack_rule()
     merge_rule()
+    medium_deferral()
     title_rule()
     version_gate(version)
     branches()

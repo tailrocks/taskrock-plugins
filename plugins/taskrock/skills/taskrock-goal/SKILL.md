@@ -34,7 +34,7 @@ Use `taskrock-issue` to build one task. Use `taskrock-plan` to plan work. A buil
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.5.0, on PATH. It also needs the `gh` command with a signed-in GitHub account.
+This skill needs the `taskrock` command-line tool, version 0.5.1, on PATH. It also needs the `gh` command with a signed-in GitHub account.
 Each runtime that a task names must be installed and signed in on this machine.
 The input is one link to an initiative, an epic, or a project.
 
@@ -51,7 +51,7 @@ Every issue that you file is part of this goal. It gets a `parent` by the parent
 taskrock --version
 ```
 
-It must print `taskrock 0.5.` followed by a patch number, such as `taskrock 0.5.0`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.5.0. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
+It must print `taskrock 0.5.` followed by a patch number of 1 or more, such as `taskrock 0.5.1`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.5.1. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
 
 Repeat steps 2 to 9 until a stop state in the Result section is true.
 
@@ -177,16 +177,16 @@ Act on each finding by its `code`:
 | `checks_pending` | ci | Wait 5 minutes, then read the status again. |
 | `mergeability_pending` | github | Wait 5 minutes, then read the status again. |
 | `bot_review_pending` | codex | Wait 5 minutes, then read the status again. You post no comment to start Codex: it reviews when the builder marks the pull request ready. |
-| `queued` | taskrock | The pull request is in the merge queue. Go on with step 6. |
+| `queued` | taskrock | The pull request is in the merge queue. Poll it with "On exit 10 with `queued`" in step 6. |
 | `draft`, `closes_missing`, `conflict`, `check_failed`, `verdict_failed` | builder | Give the finding to a builder with "When the review fails". |
 | `verdict_missing`, `threads_blocking` | reviewer | Review the head, as below. |
 | `threads_deferrable` | taskrock | Run `taskrock pr threads <pull request> --defer`. |
-| `base_not_default` | taskrock | The pull request is stacked and its base has not merged. Wait: `taskrock pr merge` of the base retargets this pull request. |
+| `base_not_default` | taskrock | The pull request is stacked and its base has not merged. This is a blocker, and the status exits 20 with `base_not_default`: the base's `taskrock pr merge` retargets this pull request. Merge the base first. |
 | `unknown_state` | taskrock | Read the status again. When the finding stays, file a Bug with "File an issue" below and tell the user. |
 | `threads_human`, `rounds_exhausted` | human | Hand the task to the user with "Hand a task to the user". |
 | `pr_not_open` | human | Follow "When a pull request is closed without a merge". |
 
-Start the reviewers on a head only when `findings` lists `verdict_missing` or `threads_blocking`, no finding has the owner `builder`, and no finding has the kind `wait`. Review each head once, in one round.
+Start the reviewers on a head only when `findings` lists `verdict_missing` or `threads_blocking`, no finding has the owner `builder` or `human`, and no finding has the kind `wait`. A finding with the owner `human` (`rounds_exhausted`, `threads_human`) goes to the user with "Hand a task to the user", and no reviewer runs on that head. Review each head once, in one round.
 
 #### Severity
 
@@ -205,8 +205,8 @@ A reproduced P0, P1 or P2 finding is always in the FAIL. A medium finding is nev
 
 Each reviewer must run on a different model than the builder.
 
-- The code reviewer reviews every head. It is the reviewer the task names: Review runtime, Review model, Review effort.
-- The security reviewer also reviews when the routing of the task names one, or when the diff touches sandboxing, credentials, CI trust, parsers of untrusted input or new dependencies. Take it from the subagents of `routing.subagent` in the `taskrock.toml` of the organization (`gh api -H "Accept: application/vnd.github.raw+json" repos/<owner>/.github/contents/taskrock.toml`) that can review and are named for security review.
+- The code reviewer reviews every head. It is the reviewer the task names: Review agent, Review runtime, Review model, Review effort.
+- The security reviewer is a `routing.subagent` entry in the `taskrock.toml` of the organization (`gh api -H "Accept: application/vnd.github.raw+json" repos/<owner>/.github/contents/taskrock.toml`) whose `can` lists `review` and whose name contains `security`. It reviews when the routing of the task names it, and when the diff touches sandboxing, credentials, CI trust, parsers of untrusted input or new dependencies. When a security review is due and no such entry exists, the security review cannot run: do not merge, and tell the user.
 
 The round of a head is one more than the number of FAIL verdicts that you posted on the pull request.
 
@@ -216,7 +216,7 @@ The round of a head is one more than the number of FAIL verdicts that you posted
 Each reviewer:
 
 1. Runs every command under `Done when` again itself. It does not trust the output in the pull request.
-2. Reads the change with `gh pr diff <pull request>` against the task.
+2. In round 1, reads the whole change with `gh pr diff <pull request>` against the task. From round 2, reads only the fix diff, `git diff <previous head>..<head>`.
 3. Reproduces each problem it finds with a command. A finding that it did not reproduce does not count: it is left out of the verdict. Each finding that counts holds its severity, its command and the output.
 4. Rules on each `blocking` thread, as below.
 5. Answers PASS or FAIL with its findings and the commit it checked:
@@ -268,7 +268,7 @@ gh pr review <pull request> --comment --body-file <file>
 
 #### When no reviewer can run
 
-If a reviewer that this head needs cannot run (the runtime is missing, signed out, or the model is refused), do not merge. Leave the pull request open, do not use another reviewer, and tell the user which pull request waits and why. First give back each task stacked on this task, with "Give back the tasks stacked on a task" below: its note says that the base waits on a reviewer.
+If a reviewer that this head needs cannot run (the runtime is missing, signed out, or the model is refused, or a due security review has no `routing.subagent` entry whose `can` lists `review` and whose name contains `security`), do not merge. Leave the pull request open, do not use another reviewer, and tell the user which pull request waits and why. First give back each task stacked on this task, with "Give back the tasks stacked on a task" below: its note says that the base waits on a reviewer.
 
 #### Route each finding of a FAIL verdict
 
@@ -289,7 +289,7 @@ The gate is one command:
 taskrock pr status <pull request>
 ```
 
-Merge only when it exits 0 and prints `READY`. Any other result is not a pass: read its findings with step 5.
+Merge only when it exits 0 and prints `READY`. Any other result is not a pass: read its findings with step 5. A `queued` finding goes to the queue poll below.
 
 Merge a pull request only when its base is the default branch, and retarget every open pull request whose base is its branch to the default branch before you merge it.
 

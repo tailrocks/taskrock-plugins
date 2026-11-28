@@ -266,9 +266,10 @@ CLAIM_RULE = (
     "issue in Triage waits until taskrock-triage sets it to Todo."
 )
 CLAIM_SKILLS = ["taskrock-goal", "taskrock-issue", "taskrock-triage"]
+TITLE_EXAMPLE = '"taskrock 0.2.1: …"'
 TITLE_RULE = (
     "A title starts with a capital letter, a digit or a code span in backticks. A lowercase "
-    'letter is allowed only for the name of the repository, as in "taskrock 0.2.1: …".'
+    f"letter is allowed only for the name of the repository, as in {TITLE_EXAMPLE}."
 )
 TITLE_SKILLS = ["taskrock-goal", "taskrock-issue", "taskrock-plan", "taskrock-triage"]
 NEW_BRANCH = re.compile(r"git (?:switch -c|checkout -b|branch )")
@@ -341,26 +342,35 @@ VERSION_MENTIONS = [
     re.compile(r"version (\d+\.\d+)\.\d+, on PATH"),
     re.compile(r"--tag v(\d+\.\d+)\.\d+"),
     re.compile(r"taskrock (\d+\.\d+)\.(?!\d)"),
+    re.compile(r"`?taskrock`? (\d+\.\d+)\.\d+"),
 ]
+VERSION_PAGES = [ROOT / "README.md", ROOT / "docs" / "installation.md"]
+
+
+def mentioned_versions(path: Path, text: str, minor: str, version: str) -> None:
+    for mention in VERSION_MENTIONS:
+        for found in mention.findall(text.replace(TITLE_EXAMPLE, "")):
+            if found != minor:
+                problem(path, f"names taskrock {found}, but VERSION is {version}: name {minor}")
 
 
 def version_gate(version: str) -> None:
     """Each version skill runs `taskrock --version` and names only the major.minor of VERSION.
 
-    A plugin patch release changes no skill text. The title-rule example `taskrock 0.2.1: ...` is not
-    a version mention: no pattern above matches it.
+    A plugin patch release changes no skill text. Every mention of a full `taskrock X.Y.Z` in a skill, the
+    README or the installation page names that major.minor too. The title-rule example is not a version
+    mention: it is cut out before the patterns run.
     """
     minor = ".".join(version.split(".")[:2])
     gate = VERSION_GATE.format(minor=minor)
+    for path in VERSION_PAGES:
+        mentioned_versions(path, path.read_text(), minor, version)
     for name in VERSION_SKILLS:
         path = SKILLS / name / "SKILL.md"
         text = path.read_text()
+        mentioned_versions(path, text, minor, version)
         if not VERSION_MENTIONS[0].search(text):
             problem(path, "does not say `version X.Y.Z, on PATH`")
-        for mention in VERSION_MENTIONS:
-            for found in mention.findall(text):
-                if found != minor:
-                    problem(path, f"names taskrock {found}, but VERSION is {version}: name {minor}")
         if "taskrock --version" not in text:
             problem(path, "does not run `taskrock --version`")
         if gate not in text:

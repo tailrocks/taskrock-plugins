@@ -190,13 +190,21 @@ Run every command under `Done when` again when you pushed code after step 8. The
 taskrock pr status <pull request>
 ```
 
-Each finding is a line `[blocker] <code> (<owner>): <message>`. Fix every finding whose owner is `builder`, except `draft`:
+Each finding is a line `[blocker] <code> (<owner>): <message>`. The finding `draft` is printed while the pull request is a draft. A status with no `draft` finding means the pull request is ready.
+
+When the pull request is ready and a `builder` finding other than `verdict_failed` is left, take it out of review before the first fix, because each push to a ready pull request starts another Codex review:
+
+```sh
+gh pr ready --undo <pull request>
+```
+
+Fix every finding whose owner is `builder`, except `draft`:
 
 - `closes_missing`: add the line `Closes #<number>` to the body, and set it with `gh pr edit <pull request> --body-file <file>`.
 - `conflict`: merge the base branch, as step 7 does, and push.
 - `check_failed`: fix the code, and push.
 
-Run `taskrock pr status <pull request>` again after each fix. Go on when no `builder` finding is left except `draft`. Then run one command:
+Run `taskrock pr status <pull request>` again after each fix. When you pushed code in this step, run every command under `Done when` again after the last push, write the new output into `Proof` of the pull request body, and set it with `gh pr edit <pull request> --body-file <file>`. Go on when no `builder` finding is left except `draft`. Then run one command:
 
 ```sh
 gh pr ready <pull request>
@@ -204,7 +212,7 @@ gh pr ready <pull request>
 
 Run it once for each round. It starts the Codex code and security review. Each push after it starts another Codex review.
 
-Run `taskrock pr status <pull request>` once more. When no `builder` finding is left, the last line of your report is `DONE <pull request link>`. When a `builder` finding is left, follow "When a review fails" if it is `verdict_failed`, and fix it as above if it is not.
+Run `taskrock pr status <pull request>` once more. When no `builder` finding is left, the last line of your report is `DONE <pull request link>`. When a `builder` finding is left, follow "When a review fails" if it is `verdict_failed`. If it is not, the pull request is ready: run `gh pr ready --undo <pull request>` first, fix it as above, push, and run `gh pr ready <pull request>` once.
 
 ### When a review fails
 
@@ -231,7 +239,7 @@ The manager hands you the task again after a review that posted `VERDICT: FAIL`.
 
 The manager hands you the task again after the base merged and it retargeted your pull request to the default branch. The pull request is ready, and each push to a ready pull request starts a Codex review. Take it out of review before you push. The steps, in this order:
 
-1. Take the pull request out of review:
+1. Take the pull request out of review. Run `taskrock pr status <pull request>`: when it prints a `draft` finding, the pull request is already a draft, so skip this command. Otherwise run:
 
    ```sh
    gh pr ready --undo <pull request>
@@ -252,21 +260,21 @@ The manager hands you the task again after the base merged and it retargeted you
    git push origin feat/issue-<number>
    ```
 
-4. Write the new output into `Proof` of the pull request body, and set it with `gh pr edit <pull request> --body-file <file>`.
-5. Read the state of the pull request:
+4. Read the state of the pull request:
 
    ```sh
    taskrock pr status <pull request>
    ```
 
    Fix every finding whose owner is `builder`, except `draft`, as step 9 says, and run the command again after each fix. Go on when no `builder` finding is left except `draft`.
+5. Run every command under `Done when` again after the last push (step 3, or a fix of step 4) and keep that output. Write it into `Proof` of the pull request body, and set it with `gh pr edit <pull request> --body-file <file>`.
 6. Mark the pull request ready, once:
 
    ```sh
    gh pr ready <pull request>
    ```
 
-   Then run `taskrock pr status <pull request>` once more and end the report as step 9 says.
+   Then run `taskrock pr status <pull request>` once more and end the report as step 9 says. The pull request is ready now, so when a `builder` finding other than `verdict_failed` is left, take it out of review first with `gh pr ready --undo <pull request>`, fix it as step 9 says, run step 5 again after the last push, and run `gh pr ready <pull request>` once.
 
 ### When you stop before the pull request
 

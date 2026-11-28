@@ -91,25 +91,32 @@ A problem that says `<url> breaks the <type> format: <message>` means the body o
 For a project link, run this sweep yourself in every round, before you attach anything. Its milestone titles are those of the tasks that you handed out so far and, in the first round, those of the tasks in `ready`. Read the milestone of a task with `gh issue view <task link> --json milestone --jq .milestone.title`. For each title, in each repository of the project (`repos` of its `[[project]]` block in `taskrock.toml`), list the open issues with their types, and read the parent of each:
 
 ```sh
-gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number,title,issueType --jq '.[] | "\(.number) \(.issueType.name) \(.title)"'
+gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --limit 1000 --json number,title,issueType --jq '.[] | "\(.number) \(.issueType.name) \(.title)"'
 gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 ```
 
 The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Each such issue is a loose item, except an Initiative: an Initiative is the top of a plan and has no parent.
 
-Attach each loose item in every round, not only before the run stops: `loose` is the list for an issue link, and the sweep is the list for a project link. Give each the parent that "Where a filed issue goes" gives, with the loose issue as the source. Attach it with this command, which changes no body:
+Attach each loose item in every round, not only before the run stops: `loose` is the list for an issue link, and the sweep is the list for a project link. Give each the parent that "Where a filed issue goes" gives, with the loose issue as the source. Attach it with this command, which changes no body. The sweep spans several repositories, so `--parent` takes the link of the parent, never a bare number (`gh issue edit --help`: "by number or URL"):
 
 ```sh
-gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
+gh issue edit <number> --repo <owner>/<repo> --parent https://github.com/<owner>/<repo>/issues/<parent number>
 ```
 
-Then load the skill `taskrock-triage` with each loose Bug or Feature that is in Triage now. For an issue link, that is a Bug or Feature whose number is also in the `triage` key of the same `taskrock ready` output. In the sweep of a project link, read its status and use it when the command prints `Triage`:
+Then read the status of each loose Bug and Feature, for an issue link and for a project link alike:
 
 ```sh
-gh issue view <number> --repo <owner>/<repo> --json projectItems --jq '.projectItems[].status.name'
+gh issue view <number> --repo <owner>/<repo> --json projectItems --jq '.projectItems[] | "\(.title)\t\(.status.name)"'
 ```
 
-A loose Task, and a loose Bug or Feature whose status is not Triage, is built as it is.
+It prints one line for each project that holds the issue. Act only on the line whose title is the title of the delivery project: the `title` of a `[[project]]` block with `kind = "delivery"` in `taskrock.toml` (`gh api -H "Accept: application/vnd.github.raw+json" repos/<owner>/.github/contents/taskrock.toml`). An issue is an item of exactly one delivery project, and the Status of a portfolio project says nothing about triage. `Triage` means: load the skill `taskrock-triage` with the item. `Todo` means: it is built as it is. For `tailrocks/velnor-new#3080` the command prints two lines, and only the first counts, because `Velnor` is its delivery project and `Roadmap` is a portfolio project:
+
+```text
+Velnor	Triage
+Roadmap	Todo
+```
+
+A loose Task is built as it is.
 
 ### 3. Take each ready task
 
@@ -247,7 +254,7 @@ When the parent that you closed is an Epic, write the retro. File a task for the
 
 Do this each time `ready` is empty and nothing is in progress.
 
-1. Give each loose item a parent. For an issue link, the key `loose` of `taskrock ready <link> --json` lists them. For a project link, run the same sweep as step 2. Attach each loose item and load the skill `taskrock-triage` as step 2 says, with the Triage test of step 2 for the kind of link.
+1. Give each loose item a parent. For an issue link, the key `loose` of `taskrock ready <link> --json` lists them. For a project link, run the same sweep as step 2. Attach each loose item and load the skill `taskrock-triage` as step 2 says, with the status rule of step 2.
 2. List the Triage items under the link:
 
 ```sh
@@ -341,13 +348,13 @@ gh issue view <parent link> --json issueType --jq .issueType.name
 gh api repos/<owner>/<repo>/issues/<parent number> --jq .sub_issues_summary.total
 ```
 
-When the parent from the parent rule has 100 sub-issues, file under a child Epic of it that has room: an Epic among its sub-issues whose count is below 100. List them with:
+Go through the entries of the parent-rule list in order. For each entry, use the entry when its count is below 100, else a child Epic of it whose count is below 100. List the child Epics with their counts:
 
 ```sh
 gh api repos/<owner>/<repo>/issues/<parent number>/sub_issues --paginate --jq '.[] | select(.type.name == "Epic") | "\(.number) \(.sub_issues_summary.total)"'
 ```
 
-When it has no child Epic with room, take the next entry of the parent-rule list instead: the parent of that parent, and so on, up to the goal link. Run the count command on each entry, and file under the first one that has room. When the goal link itself is full, file nothing, tell the user, and go on. Never file a new Epic for this: the new Epic would itself be the 101st child, and `apply` refuses it.
+When neither the entry nor a child Epic of it has room, go to the next entry of the list, the one above it. When the last entry (the goal link, or the Initiative of a project link) and its child Epics are all full, file nothing, tell the user, and go on. Never file a new Epic for this: the new Epic would itself be the 101st child, and `apply` refuses it.
 
 `apply` refuses a full parent before any `POST`, with this message: `<link> has <n> sub-issues and GitHub allows 100: file under a child Epic of it`.
 
@@ -465,7 +472,7 @@ Stop in one of these states:
 
     ```sh
     gh api "repos/<owner>/<repo>/milestones?state=all" --paginate --jq '.[].title'
-    gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number --jq length
+    gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --limit 1000 --json number --jq length
     ```
 
     The first command must list the title. When it does not, the check fails: a repository without the milestone proves nothing, because its count is 0 for any title. Print the repository and the title, say that the milestone is missing (`taskrock setup <owner>` creates the shared milestones), do not say that the work is done, and stop. The second command must print `0`.

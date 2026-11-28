@@ -296,7 +296,7 @@ taskrock pr status <pull request>
 
 Merge only when it exits 0 and prints `READY`. Any other result is not a pass: read its findings with step 5. A `queued` finding goes to the queue poll below.
 
-Merge a pull request only when its base is the default branch, and retarget every open pull request whose base is its branch to the default branch before you merge it.
+Merge a pull request only when its base is the default branch. `taskrock pr merge` retargets each open pull request based on its branch after the merge lands.
 
 `taskrock pr merge` merges at the head commit that the status judged, and retargets right after the merge lands:
 
@@ -328,7 +328,7 @@ A push after the verdict changes the head commit. Review again.
 
 Read `retarget_failures` and `retarget_error` of the JSON of the last `taskrock pr merge` run. When `retarget_failures` is not empty or `retarget_error` is not null, run `taskrock pr merge <pull request> --json` once more. The outcome `already_merged` retargets what is left. When either is still set in that output, tell the user which pull requests it could not retarget and why, hand the task of each of them to the user with "Hand a task to the user", and review none of them.
 
-Then update each pull request in `retargeted` once:
+The rerun lists in `retargeted` only the children that are still based on the branch of this pull request, so it misses the children that the first run moved. Keep the `retargeted` list of each `taskrock pr merge` run of this pull request. Then run `gh pr update-branch` once for each child in the union of those lists:
 
 ```sh
 gh pr update-branch <child pull request>
@@ -600,7 +600,7 @@ Make sure that each item is true:
 - Round 1 was a full review. Each later round checked the findings of the previous FAIL and the fix diff.
 - Every reproduced P0, P1 or P2 finding was in a FAIL. You never deferred or merged any of them, and only P3 findings were under `Non-blocking`.
 - You resolved each `blocking` bot thread that no reviewer reproduced with `taskrock pr threads <pull request> --resolve <id> --reason`, and you ran `taskrock pr threads <pull request> --defer` each round.
-- After each merge, you ran `gh pr update-branch` once for each pull request in `retargeted`.
+- After each merge, you ran `gh pr update-branch` once for each pull request in the union of the `retargeted` lists of every `taskrock pr merge` run of that pull request.
 - You stacked a task only with `taskrock claim --stacked`, on the task that `taskrock ready --stacked` listed with a `stacked` base.
 - You merged no pull request that had no reviewer, and none that lacked a reviewer its rule required.
 - Each finding that you routed was reproduced by the reviewer with a command.

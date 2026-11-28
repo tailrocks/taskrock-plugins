@@ -306,8 +306,8 @@ def stacked_claims() -> None:
 
 
 STACK_RULE = (
-    "Merge a pull request only when its base is the default branch, and retarget every open "
-    "pull request whose base is its branch to the default branch before you merge it."
+    "Merge a pull request only when its base is the default branch. `taskrock pr merge` "
+    "retargets each open pull request based on its branch after the merge lands."
 )
 
 
@@ -358,26 +358,28 @@ def merge_rule() -> None:
         problem(path, f"does not state the queue poll: {QUEUE_POLL}. A queued pull request needs it to reach MERGED")
 
 
-NEGATION = re.compile(r"\b(?:never|not|no|cannot|nor)\b|n't", re.I)
-CLAUSE_END = re.compile(r"[.;:!?]\s")
+# A negation counts only when it directly precedes the defer word: "never deferred", "not be deferred",
+# "never merged or deferred". Words between the negation and the defer word break it.
+NEGATED = re.compile(r"(?:\b(?:never|not|no|cannot|nor)|n't)\s+(?:be\s+)?(?:\w+\s+(?:or|nor|and)\s+)*$", re.I)
+CLAUSE_END = re.compile(r"[.;:!?,]\s|\s(?:but|so)\s", re.I)
 MEDIUM = re.compile(r"\bmedium\b|\bP2\b", re.I)
 DEFER_WORD = re.compile(r"\bdefer\w*", re.I)
 
 
 def defers_medium(block: str) -> bool:
-    """A block that names the medium (P2) word and has a defer word that no negation covers.
+    """A block that names the medium (P2) word and has a defer word that no negation directly precedes.
 
-    A negation covers the defer word that follows it in the same clause, so "never merged or deferred"
-    passes. A clause ends at a period, a semicolon, a colon, `!` or `?`, so a deferral in a later
-    sentence of the same block is not covered by an earlier "never".
+    A clause ends at a period, a comma, a semicolon, a colon, `!`, `?`, or the word `but` or `so`, so a
+    deferral after any of them is not covered by an earlier "never". Inside a clause, "never merged or
+    deferred" passes, and "with no decision can be deferred" fails.
     """
     flat = MARKUP.sub("", block)
     if not MEDIUM.search(flat):
         return False
-    for word in DEFER_WORD.finditer(flat):
-        clause = CLAUSE_END.split(flat[: word.start()])[-1]
-        if not NEGATION.search(clause):
-            return True
+    for clause in CLAUSE_END.split(flat):
+        for word in DEFER_WORD.finditer(clause):
+            if not NEGATED.search(clause[: word.start()]):
+                return True
     return False
 
 

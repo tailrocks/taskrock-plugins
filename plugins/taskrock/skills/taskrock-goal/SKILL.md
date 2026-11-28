@@ -41,7 +41,7 @@ The input is one link to an initiative, an epic, or a project.
 This skill changes GitHub and starts other agent sessions. It claims and releases tasks, and it posts review comments.
 It merges pull requests in step 6 and closes finished parents in step 7. It files tasks for the owner, Bugs and follow-up tasks with `taskrock apply`, and it appends to the body of a parent with `taskrock edit`.
 
-Every issue that you file is part of this goal. It gets a `parent` and a milestone by the two rules of "Where a filed issue goes", so it counts when you decide that the work is done. A draft file writes `parent = "<link>"`, and `plan.toml` writes `milestone = "<title>"`.
+Every issue that you file is part of this goal. It gets a `parent` by the parent rule of "Where a filed issue goes", and `apply` gives it the milestone of that parent, so it counts when you decide that the work is done. A draft file writes `parent = "https://github.com/<owner>/<repo>/issues/<number>"`.
 
 ## Procedure
 
@@ -86,6 +86,38 @@ A problem that says `<url> breaks the <type> format: <message>` means the body o
 - A Bug or a Feature: load the skill `taskrock-triage` with that issue, then go on with the other ready tasks.
 - A Task: file a task for the owner with "File an issue" below. It names the task and the broken section.
 
+`loose` lists the loose items: each Task, Bug, Feature or Epic with no parent. It never lists an Initiative. `ready` fills `loose` only for an issue link whose issue has a milestone. For a project link it is empty.
+
+For a project link, run this sweep yourself in every round, before you attach anything. Its milestone titles are those of the tasks that you handed out so far and, in the first round, those of the tasks in `ready`. Read the milestone of a task with `gh issue view <task link> --json milestone --jq .milestone.title`. For each title, in each repository of the project (`repos` of its `[[project]]` block in `taskrock.toml`), list the open issues with their types, and read the parent of each:
+
+```sh
+gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --limit 1000 --json number,title,issueType --jq '.[] | "\(.number) \(.issueType.name) \(.title)"'
+gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
+```
+
+The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Each such issue is a loose item, except an Initiative: an Initiative is the top of a plan and has no parent.
+
+Attach each loose item in every round, not only before the run stops: `loose` is the list for an issue link, and the sweep is the list for a project link. Give each the parent that "Where a filed issue goes" gives, with the loose issue as the source. Attach it with this command, which changes no body. The sweep spans several repositories, so `--parent` takes the link of the parent, never a bare number (`gh issue edit --help`: "by number or URL"):
+
+```sh
+gh issue edit <number> --repo <owner>/<repo> --parent https://github.com/<owner>/<repo>/issues/<parent number>
+```
+
+Then read the status of each loose Bug and Feature, for an issue link and for a project link alike:
+
+```sh
+gh issue view <number> --repo <owner>/<repo> --json projectItems --jq '.projectItems[] | "\(.title)\t\(.status.name)"'
+```
+
+It prints one line for each project that holds the issue. Act only on the line whose title is the title of the delivery project: the `title` of a `[[project]]` block with `kind = "delivery"` in `taskrock.toml` (`gh api -H "Accept: application/vnd.github.raw+json" repos/<owner>/.github/contents/taskrock.toml`). An issue is an item of exactly one delivery project, and the Status of a portfolio project says nothing about triage. `Triage` means: load the skill `taskrock-triage` with the item. `Todo` means: it is built as it is. For `tailrocks/velnor-new#3080` the command prints two lines, and only the first counts, because `Velnor` is its delivery project and `Roadmap` is a portfolio project:
+
+```text
+Velnor	Triage
+Roadmap	Todo
+```
+
+A loose Task is built as it is.
+
 ### 3. Take each ready task
 
 ```sh
@@ -123,6 +155,10 @@ For a stacked task, the prompt adds one sentence: "It is stacked on feat/issue-<
 | `minimax` | `mcode exec --model <model> "<prompt>"` |
 
 Only the `muse` line was run in a test. Check another line with the `--help` of that CLI before its first use.
+
+#### When a builder reports
+
+A builder that could not file a Bug (its task has no parent, or its parent is full) puts the text of the Bug in its report. When a report holds such a text, file the Bug with "File an issue" below, with the task of that builder as the source of "Where a filed issue goes". Do this before step 5.
 
 ### 5. Review each pull request
 
@@ -218,19 +254,7 @@ When the parent that you closed is an Epic, write the retro. File a task for the
 
 Do this each time `ready` is empty and nothing is in progress.
 
-1. Give each loose issue of the milestone a parent. List the open issues of the milestone in each repository of the project (`repos` of its `[[project]]` block in `taskrock.toml`), with their types, and read the parent of each:
-
-```sh
-gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number,title,issueType --jq '.[] | "\(.number) \(.issueType.name) \(.title)"'
-gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
-```
-
-   Only an issue of type Task, Bug or Feature gets a parent here. Skip every Initiative and Epic: an Initiative is the top of a plan and has no parent, and an Epic gets its parent when it is planned. The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Give such a Task, Bug or Feature a parent now. The parent follows "Where a filed issue goes" below, with the loose issue as the source.
-
-```sh
-gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
-```
-
+1. Give each loose item a parent. For an issue link, the key `loose` of `taskrock ready <link> --json` lists them. For a project link, run the same sweep as step 2. Attach each loose item and load the skill `taskrock-triage` as step 2 says, with the status rule of step 2.
 2. List the Triage items under the link:
 
 ```sh
@@ -302,7 +326,7 @@ Only then do the rest of the path that called this section: the release of this 
 
 ### Where a filed issue goes
 
-Every issue that you file has a source: the task it comes from, the Epic that you closed for the retro, or the loose issue of step 8. The same two rules give its `parent` and its milestone everywhere.
+Every issue that you file has a source: the task it comes from, the Epic that you closed for the retro, or a loose issue of step 2 or step 8. The parent rule and the milestone rule give its `parent` and its milestone everywhere.
 
 **Parent rule.** The `parent` of an issue that you file is an issue under the goal, never a project. Take the first of these that is the goal link or lies under it:
 
@@ -318,15 +342,31 @@ gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 gh issue view <parent link> --json issueType --jq .issueType.name
 ```
 
-**Milestone rule.** The milestone of an issue that you file is the milestone of its source. Never read the milestone of a project link. When the source has none, stop, tell the user that it needs one, and file nothing:
+**Sub-issue limit.** GitHub allows 100 sub-issues per parent. Read the count of the parent:
 
 ```sh
-gh issue view <source link> --json milestone --jq .milestone.title
+gh api repos/<owner>/<repo>/issues/<parent number> --jq .sub_issues_summary.total
+```
+
+Start at the parent that the parent rule gives. Use that issue when its count is below 100, else a child Epic of it whose count is below 100. List the child Epics with their counts:
+
+```sh
+gh api repos/<owner>/<repo>/issues/<parent number>/sub_issues --paginate --jq '.[] | select(.type.name == "Epic") | "\(.number) \(.sub_issues_summary.total)"'
+```
+
+When neither that issue nor a child Epic of it has room, take the parent of that issue with `gh api repos/<owner>/<repo>/issues/<n>/parent --jq .html_url` and repeat the check on that parent, up to and including the goal link (for a project link, the Initiative that entry 4 of the parent rule names). When that top issue and its child Epics are all full, file nothing, tell the user, and go on. Never file a new Epic for this: the new Epic would itself be the 101st child, and `apply` refuses it.
+
+`apply` refuses a full parent before any `POST`, with this message: `<link> has <n> sub-issues and GitHub allows 100: file under a child Epic of it`.
+
+**Milestone rule.** `apply` sets the milestone of an issue that you file to the milestone of its parent. Never read the milestone of a project link. When the parent has none, stop, tell the user that it needs one, and file nothing:
+
+```sh
+gh issue view <parent link> --json milestone --jq .milestone.title
 ```
 
 ### File an issue
 
-Use this for a task for the owner, a Bug, a follow-up task and the retro. Every issue is made with `taskrock apply`. It always has a parent and a milestone from "Where a filed issue goes".
+Use this for a task for the owner, a Bug, a follow-up task and the retro. Every issue is made with `taskrock apply`. It always has a parent from "Where a filed issue goes", and `apply` sets the milestone of that parent.
 
 1. Print the empty body of the type. Use `owner` for a task for the owner:
 
@@ -342,10 +382,9 @@ taskrock template Task --owner <owner>
 id = "goal-12-decision"
 repo = "<owner>/<repo>"
 project = "https://github.com/orgs/<owner>/projects/<number>"
-milestone = "<title of the milestone>"
 ```
 
-   The `project` is the delivery project that `taskrock ready` read. The `milestone` is the one that the milestone rule gives.
+   The `project` is the delivery project that `taskrock ready` read.
 
 3. Write one file, `<key>.md`, with the front matter and then the body from step 1, every section filled in. A task for the owner:
 
@@ -354,7 +393,7 @@ milestone = "<title of the milestone>"
 key = "O1"
 title = "<what the owner must decide or do>"
 type = "Task"
-parent = "<link of the parent>"
+parent = "https://github.com/<owner>/<repo>/issues/<number>"
 agent = "Owner"
 +++
 ```
@@ -370,17 +409,15 @@ taskrock check <folder>
 taskrock apply <folder>
 ```
 
-`apply` prints `created #<number> <key> <title>`. A Bug is created in Triage.
+`apply` prints `created #<number> <key> <title>`. A Bug is created in Triage. `taskrock check` refuses an issue with no parent unless it is an Initiative, and for a Task `T1` it prints `T1 has no parent. Only an Initiative has none: set parent to a key of this draft or to the link of the parent issue`, then exits with status 1. Give the draft a parent and check again.
 
-5. Check the parent and the milestone, and attach a blocker when the case needs it:
+When `apply` stops with `no milestone <title> in <repo>. Run taskrock setup`, file nothing. Tell the user which milestone the repository lacks, and go on.
+
+5. Attach a blocker when the case needs it:
 
 ```sh
-gh api repos/<owner>/<repo>/issues/<new number>/parent --jq .html_url
-gh issue view <new number> --repo <owner>/<repo> --json milestone --jq .milestone.title
 gh issue edit <task number> --repo <owner>/<repo> --add-blocked-by <new number>
 ```
-
-When the parent is missing, run `gh issue edit <new number> --repo <owner>/<repo> --parent <parent number>`. When the milestone is missing, run `gh issue edit <new number> --repo <owner>/<repo> --milestone "<title>"`.
 
 ### When a builder says the task is wrong
 
@@ -435,7 +472,7 @@ Stop in one of these states:
 
     ```sh
     gh api "repos/<owner>/<repo>/milestones?state=all" --paginate --jq '.[].title'
-    gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number --jq length
+    gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --limit 1000 --json number --jq length
     ```
 
     The first command must list the title. When it does not, the check fails: a repository without the milestone proves nothing, because its count is 0 for any title. Print the repository and the title, say that the milestone is missing (`taskrock setup <owner>` creates the shared milestones), do not say that the work is done, and stop. The second command must print `0`.

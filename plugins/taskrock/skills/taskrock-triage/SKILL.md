@@ -184,7 +184,7 @@ gh project item-edit --project-id <project id> --id <item id> --field-id <Status
 taskrock ready <project link>
 ```
 
-A Feature that is too big for one task gets sub-issues instead of Steps. Make a folder outside the repository with `plan.toml` (a new `id`, plus `repo` and `project`) (add `milestone = "<title>"` when the Feature has a milestone: `gh issue view <link> --json milestone --jq .milestone.title`) and one file for each sub-issue, each with `parent = "<link of the Feature>"`. Write each sub-issue as `taskrock-plan` does. A title starts with a capital letter, a digit or a code span in backticks. A lowercase letter is allowed only for the name of the repository, as in "taskrock 0.2.1: …". The folder holds the sub-issues only, never the Feature. Then:
+A Feature that is too big for one task gets sub-issues instead of Steps. Make a folder outside the repository with `plan.toml` (a new `id`, plus `repo` and `project`) and one file for each sub-issue, each with `parent = "https://github.com/<owner>/<repo>/issues/<number>"`, the link of the Feature. `apply` gives each sub-issue the milestone of the Feature. Write each sub-issue as `taskrock-plan` does. A title starts with a capital letter, a digit or a code span in backticks. A lowercase letter is allowed only for the name of the repository, as in "taskrock 0.2.1: …". The folder holds the sub-issues only, never the Feature. Then:
 
 ```sh
 taskrock check <folder>

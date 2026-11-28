@@ -86,13 +86,15 @@ A problem that says `<url> breaks the <type> format: <message>` means the body o
 - A Bug or a Feature: load the skill `taskrock-triage` with that issue, then go on with the other ready tasks.
 - A Task: file a task for the owner with "File an issue" below. It names the task and the broken section.
 
-`loose` lists the loose issues, the ones with no parent. Attach each one in every round, not only before the run stops: give it the parent that "Where a filed issue goes" gives, then triage it with step 8. Attach it with this command, which changes no body:
+`loose` lists the loose items: each Task, Bug, Feature or Epic with no parent. It never lists an Initiative. `ready` fills `loose` only for an issue link whose issue has a milestone. For a project link it is empty, so run the sweep of step 8.1 in every round instead, for each milestone title of the tasks that you hand out.
+
+For an issue link, attach each loose item in every round, not only before the run stops: give it the parent that "Where a filed issue goes" gives. Attach it with this command, which changes no body:
 
 ```sh
 gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
 ```
 
-When a parent has 100 sub-issues, file under a child Epic of it.
+Then load the skill `taskrock-triage` with each loose Bug or Feature whose Status is Triage now. A loose Task, and a loose Bug or Feature whose Status is Todo, is built as it is.
 
 ### 3. Take each ready task
 
@@ -254,18 +256,20 @@ When the parent that you closed is an Epic, write the retro. File a task for the
 
 Do this each time `ready` is empty and nothing is in progress.
 
-1. Give each loose issue a parent. The key `loose` of `taskrock ready <link> --json` lists them. Read the parent of each:
+1. Give each loose item a parent. For an issue link, the key `loose` of `taskrock ready <link> --json` lists them. For a project link, `loose` is empty, so list the open issues of each milestone of the tasks that you hand out, in each repository of the project (`repos` of its `[[project]]` block in `taskrock.toml`), with their types, and read the parent of each:
 
 ```sh
-taskrock ready <link> --json
+gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number,title,issueType --jq '.[] | "\(.number) \(.issueType.name) \(.title)"'
 gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 ```
 
-   Only an issue of type Task, Bug or Feature gets a parent here. Skip every Initiative and Epic: an Initiative is the top of a plan and has no parent, and an Epic gets its parent when it is planned. The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Give such a Task, Bug or Feature a parent now. The parent follows "Where a filed issue goes" below, with the loose issue as the source.
+   The second command prints `HTTP 404` and exits with status 1 when the issue has no parent. Attach each loose Task, Bug, Feature or Epic, and never an Initiative: an Initiative is the top of a plan and has no parent. The parent follows "Where a filed issue goes" below, with the loose issue as the source. Attach it with this command:
 
 ```sh
 gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
 ```
+
+   Then load the skill `taskrock-triage` with each loose Bug or Feature whose Status is Triage, as step 2 says.
 
 2. List the Triage items under the link:
 
@@ -354,6 +358,31 @@ gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 gh issue view <parent link> --json issueType --jq .issueType.name
 ```
 
+**Sub-issue limit.** GitHub allows 100 sub-issues per parent. Read the count of the parent:
+
+```sh
+gh api repos/<owner>/<repo>/issues/<parent number> --jq .sub_issues_summary.total
+```
+
+When the parent has 100 sub-issues, file under a child Epic of it that has room: an Epic among its sub-issues whose count is below 100. List them with:
+
+```sh
+gh api repos/<owner>/<repo>/issues/<parent number>/sub_issues --paginate --jq '.[] | select(.type.name == "Epic") | "\(.number) \(.sub_issues_summary.total)"'
+```
+
+When the parent has no child Epic with room, file a new Epic in the same draft as the issue, with the Epic sections of `taskrock template Epic`. The Epic's `parent` is the link of the full parent, and the issue's `parent` is the key of that Epic. Give the Epic the title `<parent title>: issues filed while it is built`. `taskrock check` refuses an Epic with no children, so the Epic and the issue must go in one draft:
+
+```text
++++
+key = "E1"
+title = "<parent title>: issues filed while it is built"
+type = "Epic"
+parent = "https://github.com/<owner>/<repo>/issues/<parent number>"
++++
+```
+
+`apply` refuses a full parent before any `POST`, with this message: `<link> has <n> sub-issues and GitHub allows 100: file under a child Epic of it`.
+
 **Milestone rule.** `apply` sets the milestone of an issue that you file to the milestone of its parent. Never read the milestone of a project link. When the parent has none, stop, tell the user that it needs one, and file nothing:
 
 ```sh
@@ -406,6 +435,8 @@ taskrock apply <folder>
 ```
 
 `apply` prints `created #<number> <key> <title>`. A Bug is created in Triage. `taskrock check` refuses an issue with no parent unless it is an Initiative, and for a Task `T1` it prints `T1 has no parent. Only an Initiative has none: set parent to a key of this draft or to the link of the parent issue`, then exits with status 1. Give the draft a parent and check again.
+
+When `apply` stops with `no milestone <title> in <repo>. Run taskrock setup`, file nothing. Tell the user which milestone the repository lacks, and go on.
 
 5. Attach a blocker when the case needs it:
 

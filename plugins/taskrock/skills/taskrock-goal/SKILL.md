@@ -190,8 +190,24 @@ gh pr edit <each number> --base <default branch>
 
 ```sh
 gh pr view <pull request> --json headRefOid --jq .headRefOid
+gh api graphql -f query='query($o:String!,$r:String!,$b:String!){repository(owner:$o,name:$r){mergeQueue(branch:$b){id}}}' -f o=<owner> -f r=<repo> -f b=<default branch> --jq '.data.repository.mergeQueue.id'
+```
+
+The query prints `null` when the default branch has no merge queue. Then merge at once:
+
+```sh
 gh pr merge <pull request> --squash --match-head-commit <that value>
 ```
+
+When the query prints an id, the default branch has a merge queue. Enqueue the pull request with its head commit pinned, then wait until it is merged:
+
+```sh
+gh pr view <pull request> --json id --jq .id
+gh api graphql -f query='mutation($id:ID!,$h:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$h}){mergeQueueEntry{position state}}}' -f id=<node id> -f h=<that value>
+gh pr view <pull request> --json state --jq .state
+```
+
+Go on to step 7 only when the last command prints `MERGED`. When the queue removes the pull request, it is not merged: read why, and handle it as a failed check.
 
 GitHub deletes the merged branch, and a pull request still based on a deleted branch is closed for good, so retarget first. After the merge, start a builder for the task of each pull request that you retargeted, on its routing, with the prompt "use the skill taskrock-issue with <task link>. The task is already taken for you. Its base merged: merge the default branch, run Done when again and push." Its head commit changes, so review it again with step 5 before it passes this gate.
 

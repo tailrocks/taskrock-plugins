@@ -302,6 +302,14 @@ def stack_rule() -> None:
         problem(path, "does not state the stack rule: Merge a pull request only when its base is the default branch")
 
 
+def merge_queue_rule() -> None:
+    path = SKILLS / "taskrock-goal" / "SKILL.md"
+    text = path.read_text()
+    for word in ("enqueuePullRequest", "expectedHeadOid"):
+        if word not in text:
+            problem(path, f"does not name `{word}`, which enqueues a pull request with its head commit pinned")
+
+
 def title_rule() -> None:
     for name in TITLE_SKILLS:
         path = SKILLS / name / "SKILL.md"
@@ -348,6 +356,7 @@ def main() -> int:
     claim_rule()
     stacked_claims()
     stack_rule()
+    merge_queue_rule()
     title_rule()
     branches()
     tailrocks()

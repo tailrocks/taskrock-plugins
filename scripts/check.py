@@ -148,6 +148,29 @@ def gh_issue() -> None:
             problem(path, f"names `{match}`. Use taskrock apply or taskrock edit")
 
 
+GH_MILESTONE_EDIT = re.compile(r"gh issue edit[^\n]*--milestone")
+FRONT_MATTER = re.compile(r"^\+\+\+\n(.*?)\n\+\+\+$", re.S | re.M)
+FRONT_TYPE = re.compile(r'^type = "([^"]*)"$', re.M)
+FRONT_PARENT = re.compile(r"^parent = ", re.M)
+
+
+def filing() -> None:
+    """A filed issue has a parent, apply sets its milestone, and the goal attaches loose issues."""
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        text = path.read_text()
+        if GH_MILESTONE_EDIT.search(text):
+            problem(path, "runs `gh issue edit --milestone`. apply sets the milestone of a filed issue from its parent")
+        if "leave out that line" in text:
+            problem(path, 'says "leave out that line". A filed issue always has a parent')
+        for block in FRONT_MATTER.findall(text):
+            kind = FRONT_TYPE.search(block)
+            if kind and kind.group(1) != "Initiative" and not FRONT_PARENT.search(block):
+                problem(path, f"front matter of type {kind.group(1)} has no parent")
+    goal = SKILLS / "taskrock-goal" / "SKILL.md"
+    if "`loose`" not in goal.read_text():
+        problem(goal, "does not name the key `loose` of taskrock ready")
+
+
 def routing() -> None:
     table = (ROOT / "scripts" / "routing.md").read_text()
     for path in sorted(SKILLS.glob("*/SKILL.md")):
@@ -319,6 +342,7 @@ def main() -> int:
     commands()
     flags()
     gh_issue()
+    filing()
     routing()
     scope()
     claim_rule()

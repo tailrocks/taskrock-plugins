@@ -41,7 +41,7 @@ The input is one link to an initiative, an epic, or a project.
 This skill changes GitHub and starts other agent sessions. It claims and releases tasks, and it posts review comments.
 It merges pull requests in step 6 and closes finished parents in step 7. It files tasks for the owner, Bugs and follow-up tasks with `taskrock apply`, and it appends to the body of a parent with `taskrock edit`.
 
-Every issue that you file is part of this goal. It gets a `parent` and a milestone by the two rules of "Where a filed issue goes", so it counts when you decide that the work is done. A draft file writes `parent = "<link>"`, and `plan.toml` writes `milestone = "<title>"`.
+Every issue that you file is part of this goal. It gets a `parent` by the parent rule of "Where a filed issue goes", and `apply` gives it the milestone of that parent, so it counts when you decide that the work is done. A draft file writes `parent = "https://github.com/<owner>/<repo>/issues/<number>"`.
 
 ## Procedure
 
@@ -85,6 +85,14 @@ A problem that says `<url> breaks the <type> format: <message>` means the body o
 
 - A Bug or a Feature: load the skill `taskrock-triage` with that issue, then go on with the other ready tasks.
 - A Task: file a task for the owner with "File an issue" below. It names the task and the broken section.
+
+`loose` lists the loose issues, the ones with no parent. Attach each one in every round, not only before the run stops: give it the parent that "Where a filed issue goes" gives, then triage it with step 8. Attach it with this command, which changes no body:
+
+```sh
+gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
+```
+
+When a parent has 100 sub-issues, file under a child Epic of it.
 
 ### 3. Take each ready task
 
@@ -218,10 +226,10 @@ When the parent that you closed is an Epic, write the retro. File a task for the
 
 Do this each time `ready` is empty and nothing is in progress.
 
-1. Give each loose issue of the milestone a parent. List the open issues of the milestone in each repository of the project (`repos` of its `[[project]]` block in `taskrock.toml`), with their types, and read the parent of each:
+1. Give each loose issue a parent. The key `loose` of `taskrock ready <link> --json` lists them. Read the parent of each:
 
 ```sh
-gh issue list --repo <owner>/<repo> --milestone "<title>" --state open --json number,title,issueType --jq '.[] | "\(.number) \(.issueType.name) \(.title)"'
+taskrock ready <link> --json
 gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 ```
 
@@ -302,7 +310,7 @@ Only then do the rest of the path that called this section: the release of this 
 
 ### Where a filed issue goes
 
-Every issue that you file has a source: the task it comes from, the Epic that you closed for the retro, or the loose issue of step 8. The same two rules give its `parent` and its milestone everywhere.
+Every issue that you file has a source: the task it comes from, the Epic that you closed for the retro, or a loose issue of step 2 or step 8. The parent rule and the milestone rule give its `parent` and its milestone everywhere.
 
 **Parent rule.** The `parent` of an issue that you file is an issue under the goal, never a project. Take the first of these that is the goal link or lies under it:
 
@@ -318,15 +326,15 @@ gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 gh issue view <parent link> --json issueType --jq .issueType.name
 ```
 
-**Milestone rule.** The milestone of an issue that you file is the milestone of its source. Never read the milestone of a project link. When the source has none, stop, tell the user that it needs one, and file nothing:
+**Milestone rule.** `apply` sets the milestone of an issue that you file to the milestone of its parent. Never read the milestone of a project link. When the parent has none, stop, tell the user that it needs one, and file nothing:
 
 ```sh
-gh issue view <source link> --json milestone --jq .milestone.title
+gh issue view <parent link> --json milestone --jq .milestone.title
 ```
 
 ### File an issue
 
-Use this for a task for the owner, a Bug, a follow-up task and the retro. Every issue is made with `taskrock apply`. It always has a parent and a milestone from "Where a filed issue goes".
+Use this for a task for the owner, a Bug, a follow-up task and the retro. Every issue is made with `taskrock apply`. It always has a parent from "Where a filed issue goes", and `apply` sets the milestone of that parent.
 
 1. Print the empty body of the type. Use `owner` for a task for the owner:
 
@@ -342,10 +350,9 @@ taskrock template Task --owner <owner>
 id = "goal-12-decision"
 repo = "<owner>/<repo>"
 project = "https://github.com/orgs/<owner>/projects/<number>"
-milestone = "<title of the milestone>"
 ```
 
-   The `project` is the delivery project that `taskrock ready` read. The `milestone` is the one that the milestone rule gives.
+   The `project` is the delivery project that `taskrock ready` read.
 
 3. Write one file, `<key>.md`, with the front matter and then the body from step 1, every section filled in. A task for the owner:
 
@@ -354,7 +361,7 @@ milestone = "<title of the milestone>"
 key = "O1"
 title = "<what the owner must decide or do>"
 type = "Task"
-parent = "<link of the parent>"
+parent = "https://github.com/<owner>/<repo>/issues/<number>"
 agent = "Owner"
 +++
 ```
@@ -370,17 +377,13 @@ taskrock check <folder>
 taskrock apply <folder>
 ```
 
-`apply` prints `created #<number> <key> <title>`. A Bug is created in Triage.
+`apply` prints `created #<number> <key> <title>`. A Bug is created in Triage. `taskrock check` refuses an issue with no parent unless it is an Initiative, and for a Task `T1` it prints `T1 has no parent. Only an Initiative has none: set parent to a key of this draft or to the link of the parent issue`, then exits with status 1. Give the draft a parent and check again.
 
-5. Check the parent and the milestone, and attach a blocker when the case needs it:
+5. Attach a blocker when the case needs it:
 
 ```sh
-gh api repos/<owner>/<repo>/issues/<new number>/parent --jq .html_url
-gh issue view <new number> --repo <owner>/<repo> --json milestone --jq .milestone.title
 gh issue edit <task number> --repo <owner>/<repo> --add-blocked-by <new number>
 ```
-
-When the parent is missing, run `gh issue edit <new number> --repo <owner>/<repo> --parent <parent number>`. When the milestone is missing, run `gh issue edit <new number> --repo <owner>/<repo> --milestone "<title>"`.
 
 ### When a builder says the task is wrong
 

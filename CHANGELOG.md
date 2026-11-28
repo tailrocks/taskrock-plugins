@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `taskrock-goal`: attaches each loose issue in every round, from the key `loose` of `taskrock ready --json`. A filed issue gets its parent by the parent rule, and `apply` sets the milestone of that parent. No step sets a milestone with `gh issue edit`.
+- `taskrock-issue`: a friction Bug gets the full link of the parent of the task as its `parent`, and `apply` gives it the milestone of that parent.
+- `taskrock-triage`: a Feature split into sub-issues gets the full link of the Feature as each `parent`, and `apply` gives each sub-issue the milestone of the Feature.
+- `scripts/check.py`: fails on `gh issue edit --milestone`, on the phrase "leave out that line", on a filed front matter with no `parent`, and on a `taskrock-goal` that does not name the key `loose`.
+
 ## 0.3.0
 
 - All skills need taskrock 0.3.0.

@@ -215,18 +215,17 @@ mkdir <folder>
 taskrock template Bug > <folder>/B1.md
 ```
 
-Fill `<folder>/B1.md`. The front matter has `key`, `title`, `type = "Bug"` and `parent`, and no routing key. The `parent` is the link of the parent (the epic) of your task. Write every section of the template. Write a `<folder>/plan.toml` with the delivery project, in the format of `taskrock-plan`, and the milestone of your task:
+Fill `<folder>/B1.md`. The front matter has `key`, `title`, `type = "Bug"` and `parent`, and no routing key. The `parent` is the full link of the parent (the epic) of your task, as `https://github.com/<owner>/<repo>/issues/<number>`, never a bare number:
+
+```toml
+parent = "https://github.com/<owner>/<repo>/issues/<number>"
+```
+
+Write every section of the template. Write a `<folder>/plan.toml` with the delivery project, in the format of `taskrock-plan`. Get the link of the parent with:
 
 ```sh
 gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
-gh issue view <link> --json milestone --jq .milestone.title
 ```
-
-```toml
-milestone = "<title of the milestone of your task>"
-```
-
-When your task has no parent or no milestone, leave out that line.
 
 A title starts with a capital letter, a digit or a code span in backticks. A lowercase letter is allowed only for the name of the repository, as in "taskrock 0.2.1: …".
 
@@ -234,7 +233,7 @@ A title starts with a capital letter, a digit or a code span in backticks. A low
 taskrock apply <folder>
 ```
 
-The Bug lands in Triage under the epic of your task, with its milestone. Then go on with your task. Use a folder outside the repository. Put the link of the Bug in your final report, above the last line.
+The Bug lands in Triage under the epic of your task, with the milestone of that epic, which `apply` sets. When your task has no parent, file nothing and put the Bug in your final report. Then go on with your task. Use a folder outside the repository. Put the link of the Bug in your final report, above the last line.
 
 ## Result
 

@@ -31,10 +31,10 @@ Use this skill when the user gives you the link of one issue of type Task, Bug o
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.4.0, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
+This skill needs the `taskrock` command-line tool, version 0.5.0, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
 The input is one issue link. The issue holds the Steps, the Done when list, and the Out of scope list.
 
-This skill changes GitHub. Step 3 takes the task for you. Step 5 pushes commits to the task branch. Step 8 opens a pull request.
+This skill changes GitHub. Step 3 takes the task for you. Step 5 pushes commits to the task branch. Step 8 opens a draft pull request. Step 9 marks it ready.
 The skill never merges. The manager merges.
 
 ## Procedure
@@ -45,7 +45,7 @@ The skill never merges. The manager merges.
 taskrock --version
 ```
 
-It must print `taskrock 0.4.` followed by a patch number, such as `taskrock 0.4.0`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.4.0. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
+It must print `taskrock 0.5.` followed by a patch number, such as `taskrock 0.5.0`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.5.0. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
 
 ### 1. Route
 
@@ -149,7 +149,15 @@ git merge origin/feat/issue-<base>
 
 Fix any conflict. Then run every command under `Done when` again and keep the new output. Open the pull request only after every box passes on the merged branch.
 
-### 8. Open the pull request
+### 8. Open the pull request as a draft
+
+Look for a pull request of the branch first. A rerun of the same task finds its own:
+
+```sh
+gh pr list --repo <owner>/<repo> --head feat/issue-<number> --state open --json url --jq '.[0].url'
+```
+
+When it prints a link, reuse that pull request: do not run `gh pr create`. Write the body below with the output of step 7 and set it with `gh pr edit <pull request> --body-file <file>`. When it prints nothing, create the pull request.
 
 Write the body to a file. It has four sections and one line:
 
@@ -165,12 +173,59 @@ Closes #<number>
 `Proof` holds each `Done when` command with its output from step 7. `Done when` repeats the checklist with every box ticked.
 
 ```sh
-GH_PR_CREATE_DRAFT=0 gh pr create --base <base branch> --head feat/issue-<number> --title "<type>: <summary>" --body-file <file>
+gh pr create --draft --base <base branch> --head feat/issue-<number> --title "<type>: <summary>" --body-file <file>
 ```
 
 `<base branch>` is `feat/issue-<base>` for a stacked task whose base pull request still prints `OPEN`, and the default branch for any other task.
 
 The title follows Conventional Commits.
+
+Codex reviews a pull request that is ready, on every push, and skips a draft. Push as often as you need while the pull request is a draft.
+
+### 9. Mark the pull request ready
+
+Run every command under `Done when` again when you pushed code after step 8. Then read the state of the pull request:
+
+```sh
+taskrock pr status <pull request>
+```
+
+Each finding is a line `[blocker] <code> (<owner>): <message>`. Fix every finding whose owner is `builder`, except `draft`:
+
+- `closes_missing`: add the line `Closes #<number>` to the body, and set it with `gh pr edit <pull request> --body-file <file>`.
+- `conflict`: merge the base branch, as step 7 does, and push.
+- `check_failed`: fix the code, and push.
+
+Run `taskrock pr status <pull request>` again after each fix. Go on when no `builder` finding is left except `draft`. Then run one command:
+
+```sh
+gh pr ready <pull request>
+```
+
+Run it once for each round. It starts the Codex code and security review. Each push after it starts another Codex review.
+
+Run `taskrock pr status <pull request>` once more. When no `builder` finding is left, the last line of your report is `DONE <pull request link>`. When a `builder` finding is left, follow "When a review fails" if it is `verdict_failed`, and fix it as above if it is not.
+
+### When a review fails
+
+The manager hands you the task again after a review that posted `VERDICT: FAIL`. `taskrock pr status <pull request>` then prints a `verdict_failed (builder)` finding. A round has these steps, in this order:
+
+1. Take the pull request out of review:
+
+   ```sh
+   gh pr ready --undo <pull request>
+   ```
+
+2. Fix every finding of the FAIL verdict. Run every command under `Done when` again.
+3. Push to `feat/issue-<number>`.
+4. Resolve each bot thread that you fixed. `taskrock pr status --json <pull request>` lists each unresolved thread under `threads`, with its `id`, `severity` and `url`:
+
+   ```sh
+   taskrock pr threads <pull request> --resolve <id> --reason "Fixed in <sha>"
+   ```
+
+   `<sha>` is the commit that holds the fix.
+5. Do step 9 again: it runs `taskrock pr status`, fixes each `builder` finding, and runs `gh pr ready <pull request>` once.
 
 ### When the base of a stacked task merged
 
@@ -258,7 +313,7 @@ The Bug lands in Triage under the parent of your task, with the milestone of tha
 
 The last line of your report is exactly one of these:
 
-- `DONE <pull request link>`: the pull request is open. Do not merge.
+- `DONE <pull request link>`: the pull request is ready for review and `taskrock pr status` shows no `builder` finding. Do not merge.
 - `BLOCKED <what blocks, and the link of the blocker>`: you stopped, wrote the note and released the task.
 - `TASK_WRONG <what is wrong>`: the task is wrong, you wrote the note and released the task.
 
@@ -273,6 +328,9 @@ Make sure that each item is true:
 - You merged the default branch into the task branch and ran every command under `Done when` again, and saw its result yourself.
 - For a stacked task, you merged `origin/feat/issue-<base>` while its base pull request was open, or the default branch after it merged, and the base of the pull request was `feat/issue-<base>` or the default branch.
 - The pull request body has the sections `Why`, `What`, `Proof`, and `Done when`, and the line `Closes #<number>`.
+- You reused the open pull request of `feat/issue-<number>` when there was one, and opened a new pull request as a draft with `gh pr create --draft` when there was none.
+- You ran `gh pr ready <pull request>` once for the round, after `taskrock pr status` showed no `builder` finding except `draft`.
+- In a fix round, you ran `gh pr ready --undo <pull request>` first, and resolved each fixed bot thread with `taskrock pr threads <pull request> --resolve <id> --reason "Fixed in <sha>"`.
 - When you stopped before the pull request, the note has the sections `Done`, `Verified`, `State` and `Next step`, and `taskrock release <link> --note <file>` ran.
 - When you filed a friction Bug, it has the parent of your task as its parent, and apply gave it that parent's milestone, and your report names its link.
 - The last line of your report is `DONE`, `BLOCKED` or `TASK_WRONG`, as described under "Result".

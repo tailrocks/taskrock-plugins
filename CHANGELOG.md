@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- All skills need taskrock 0.5.0. Every skill that runs `taskrock --version` accepts only taskrock 0.5.x, and `scripts/check.py` checks every `taskrock X.Y.Z` mention against `VERSION`. The `check` task in `mise.toml` builds taskrock 0.5.0 from its release commit.
+- `taskrock-issue`: opens its pull request as a draft with `gh pr create --draft`, and first reuses the open pull request of `feat/issue-<number>` when a rerun finds one. Codex skips a draft, so the builder pushes as often as it needs while the pull request is a draft.
+- `taskrock-issue`: after every `Done when` command passes, it reads `taskrock pr status <pull request>` and fixes each `builder` finding except `draft`: `closes_missing` (add `Closes #<number>` to the body), `conflict` (merge the base branch) and `check_failed` (fix the code). Then it runs `gh pr ready <pull request>` once, which starts the Codex code and security review, and reports `DONE` when no `builder` finding is left.
+- `taskrock-issue`: a fix round starts from a FAIL verdict (`verdict_failed`). It runs `gh pr ready --undo <pull request>`, fixes every finding, pushes, resolves each fixed bot thread with `taskrock pr threads <pull request> --resolve <id> --reason "Fixed in <sha>"`, and runs `gh pr ready <pull request>` once.
+- `taskrock-issue`: `GH_PR_CREATE_DRAFT=0` is gone from the `gh pr create` line.
+
 ## 0.4.0
 
 - All skills need taskrock 0.4.0.

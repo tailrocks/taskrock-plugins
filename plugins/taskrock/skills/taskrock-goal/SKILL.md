@@ -34,7 +34,7 @@ Use `taskrock-issue` to build one task. Use `taskrock-plan` to plan work. A buil
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.4.0, on PATH. It also needs the `gh` command with a signed-in GitHub account.
+This skill needs the `taskrock` command-line tool, version 0.5.0, on PATH. It also needs the `gh` command with a signed-in GitHub account.
 Each runtime that a task names must be installed and signed in on this machine.
 The input is one link to an initiative, an epic, or a project.
 
@@ -51,7 +51,7 @@ Every issue that you file is part of this goal. It gets a `parent` by the parent
 taskrock --version
 ```
 
-It must print `taskrock 0.4.` followed by a patch number, such as `taskrock 0.4.0`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.4.0. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
+It must print `taskrock 0.5.` followed by a patch number, such as `taskrock 0.5.0`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.5.0. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
 
 Repeat steps 2 to 9 until a stop state in the Result section is true.
 

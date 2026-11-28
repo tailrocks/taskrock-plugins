@@ -148,10 +148,13 @@ def gh_issue() -> None:
             problem(path, f"names `{match}`. Use taskrock apply or taskrock edit")
 
 
-GH_MILESTONE_EDIT = re.compile(r"gh issue edit[^\n]*--milestone")
+GH_MILESTONE_EDIT = re.compile(r"gh issue edit(?:[^\n]*\\\n)*[^\n]*--milestone")
 FRONT_MATTER = re.compile(r"^\+\+\+\n(.*?)\n\+\+\+$", re.S | re.M)
+TOML_FENCE = re.compile(r"```toml\n(.*?)```", re.S)
 FRONT_TYPE = re.compile(r'^type = "([^"]*)"$', re.M)
-FRONT_PARENT = re.compile(r"^parent = ", re.M)
+FRONT_PARENT = re.compile(r'^parent = "(?:https://github\.com/|<link)', re.M)
+LEAVE_OUT = re.compile(r"leave out that line", re.I)
+STEP_2 = re.compile(r"^### 2\. .*?(?=^### |\Z)", re.S | re.M)
 
 
 def filing() -> None:
@@ -160,15 +163,18 @@ def filing() -> None:
         text = path.read_text()
         if GH_MILESTONE_EDIT.search(text):
             problem(path, "runs `gh issue edit --milestone`. apply sets the milestone of a filed issue from its parent")
-        if "leave out that line" in text:
+        if LEAVE_OUT.search(text):
             problem(path, 'says "leave out that line". A filed issue always has a parent')
-        for block in FRONT_MATTER.findall(text):
+        if path.parent.name == "taskrock-plan":
+            continue
+        for block in FRONT_MATTER.findall(text) + TOML_FENCE.findall(text):
             kind = FRONT_TYPE.search(block)
             if kind and kind.group(1) != "Initiative" and not FRONT_PARENT.search(block):
-                problem(path, f"front matter of type {kind.group(1)} has no parent")
+                problem(path, f'an example of type {kind.group(1)} has no parent as a full link: parent = "https://github.com/<owner>/<repo>/issues/<number>"')
     goal = SKILLS / "taskrock-goal" / "SKILL.md"
-    if "`loose`" not in goal.read_text():
-        problem(goal, "does not name the key `loose` of taskrock ready")
+    step_2 = STEP_2.search(goal.read_text())
+    if not step_2 or "`loose`" not in step_2.group(0):
+        problem(goal, "step 2 does not name the key `loose` of taskrock ready")
 
 
 def routing() -> None:
@@ -308,6 +314,9 @@ def merge_queue_rule() -> None:
     for word in ("enqueuePullRequest", "expectedHeadOid"):
         if word not in text:
             problem(path, f"does not name `{word}`, which enqueues a pull request with its head commit pinned")
+    # The enqueue also selects mergeQueueEntry, so the word alone does not prove the poll.
+    if not any("query(" in line and "mergeQueueEntry" in line for line in text.splitlines()):
+        problem(path, "does not poll `mergeQueueEntry` with a query, which tells a queued pull request from a dequeued one")
 
 
 def title_rule() -> None:

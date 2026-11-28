@@ -4,10 +4,10 @@
 
 - All skills need taskrock 0.4.0.
 - Every skill that runs `taskrock --version` accepts only taskrock 0.4.x. On a newer minor or major version it stops and tells the user to update the plugin. `scripts/check.py` requires that stop text.
-- `taskrock-goal`: attaches each loose issue in every round, from the key `loose` of `taskrock ready --json`. A filed issue gets its parent by the parent rule, and `apply` sets the milestone of that parent. No step sets a milestone with `gh issue edit`.
-- `taskrock-issue`: a friction Bug gets the full link of the parent of the task as its `parent`, and `apply` gives it the milestone of that parent.
+- `taskrock-goal`: attaches each loose Task, Bug, Feature or Epic in every round: from the key `loose` of `taskrock ready --json` for an issue link, and from the milestone sweep for a project link. A loose Bug or Feature is triaged. A filed issue gets its parent by the parent rule, under a child Epic when its parent has 100 sub-issues, and `apply` sets the milestone of that parent. A missing milestone stops the filing and is reported. No step sets a milestone with `gh issue edit`.
+- `taskrock-issue`: a friction Bug gets the full link of the parent of the task as its `parent`, and `apply` gives it the milestone of that parent. When the task has no parent, or `apply` finds no milestone, the Bug stays in the final report.
 - `taskrock-triage`: a Feature split into sub-issues gets the full link of the Feature as each `parent`, and `apply` gives each sub-issue the milestone of the Feature.
-- `scripts/check.py`: fails on `gh issue edit --milestone`, on the phrase "leave out that line", on a filed front matter with no `parent`, and on a `taskrock-goal` that does not name the key `loose`.
+- `scripts/check.py`: fails on `gh issue edit --milestone` (also on a continuation line), on "leave out that line" in any case, on an example of an issue type with no `parent` that is a full link, and on a `taskrock-goal` whose step 2 does not name the key `loose`.
 - `taskrock-goal`: step 6 merges through the merge queue when the default branch has one, enqueuing the pull request with its head commit pinned by `expectedHeadOid`, and keeps `gh pr merge` when it has none; `scripts/check.py` requires `enqueuePullRequest` and `expectedHeadOid`.
 
 ## 0.3.0

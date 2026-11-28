@@ -154,7 +154,7 @@ TOML_FENCE = re.compile(r"```toml\n(.*?)```", re.S)
 FRONT_TYPE = re.compile(r'^type = "([^"]*)"$', re.M)
 FRONT_PARENT = re.compile(r'^parent = "(?:https://github\.com/|<link)', re.M)
 LEAVE_OUT = re.compile(r"leave out that line", re.I)
-STEP_2 = re.compile(r"^### 2\. .*?(?=^### |\Z)", re.S | re.M)
+STEP_2 = re.compile(r"^### 2\. .*?(?=(?:^### )|(?:\Z))", re.S | re.M)
 
 
 def filing() -> None:

@@ -32,7 +32,7 @@ Use `taskrock-plan` to plan work. Use `taskrock-issue` to build one ready issue.
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.4.0, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
+This skill needs the `taskrock` command-line tool, version 0.5.0, on PATH. It also needs the `gh` command with a signed-in GitHub account and the `git` command.
 The input is the link of one issue, or the link of a delivery project. The status of each issue it triages is Triage.
 
 This skill changes GitHub. Step 5 edits the body, the routing fields and the status of an issue, can create sub-issues, posts comments and closes issues.
@@ -49,7 +49,7 @@ Write no code for an issue that taskrock claim did not take: its Status is In Pr
 taskrock --version
 ```
 
-It must print `taskrock 0.4.` followed by a patch number, such as `taskrock 0.4.0`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.4.0. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
+It must print `taskrock 0.5.` followed by a patch number, such as `taskrock 0.5.0`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.5.0. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
 
 ### 1. Route the link
 

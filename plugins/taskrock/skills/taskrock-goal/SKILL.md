@@ -34,7 +34,7 @@ Use `taskrock-issue` to build one task. Use `taskrock-plan` to plan work. A buil
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.5.1, on PATH. It also needs the `gh` command with a signed-in GitHub account.
+This skill needs the `taskrock` command-line tool, version 0.5.2, on PATH. It also needs the `gh` command with a signed-in GitHub account.
 Each runtime that a task names must be installed and signed in on this machine.
 The input is one link to an initiative, an epic, or a project.
 
@@ -51,7 +51,7 @@ Every issue that you file is part of this goal. It gets a `parent` by the parent
 taskrock --version
 ```
 
-It must print `taskrock 0.5.` followed by a patch number of 1 or more, such as `taskrock 0.5.1`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.5.1. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
+It must print `taskrock 0.5.` followed by a patch number of 2 or more, such as `taskrock 0.5.2`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.5.2. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
 
 Repeat steps 2 to 9 until a stop state in the Result section is true.
 
@@ -298,24 +298,24 @@ Merge only when it exits 0 and prints `READY`. Any other result is not a pass: r
 
 Merge a pull request only when its base is the default branch, and retarget every open pull request whose base is its branch to the default branch before you merge it.
 
-`taskrock pr merge` does both. It merges at the head commit that the status judged:
+`taskrock pr merge` merges at the head commit that the status judged, and retargets right after the merge lands:
 
 ```sh
 taskrock pr merge <pull request> --json
 ```
 
-It points each open pull request based on the branch of this pull request at the default branch. Then it puts the pull request in the merge queue when the default branch has one, and squash-merges it when it has none. The JSON has `outcome` (`merged`, `queued`, `already_merged`, `not_ready` or `refused`), `head`, `merge_commit` and `retargeted`, the numbers of the pull requests that it retargeted. Keep `retargeted` until the pull request is merged.
+It puts the pull request in the merge queue when the default branch has one, and squash-merges it when it has none. After a merge it points each open pull request based on the branch of this pull request at the base of this pull request. The JSON has `outcome` (`merged`, `queued`, `already_merged`, `not_ready` or `refused`), `head`, `merge_commit`, `retargeted`, `retarget_failures` and `retarget_error`. `retargeted` has the numbers of the pull requests that it moved. `retarget_failures` has one entry with `number` and `error` for each child that GitHub refused to move, and is empty when none failed. `retarget_error` is null, or the error of the listing of the children. For `queued`, `not_ready` and `refused`, `retargeted` and `retarget_failures` are empty and `retarget_error` is null, because the pull request has not merged.
 
 Read the exit code:
 
-- 0: the pull request is merged. Go on to "After the merge".
+- 0: the pull request is merged (`outcome` is `merged` or `already_merged`). A failed retarget does not change the exit code. Go on to "After the merge".
 - 10: the pull request is queued (`outcome` is `queued`), or it is not ready and waits (`outcome` is `not_ready`). For `not_ready`, read the status with step 5. For `queued`, poll as below.
 - 20: GitHub refused the merge (`outcome` is `refused`, and its message is on standard error), or the pull request is not ready and blocked (`not_ready`). For `not_ready`, read the status with step 5. For `refused`, tell the user the message and leave the pull request open.
 - 3: the pull request comes from a fork, and taskrock never merges a fork. Tell the user.
 
 On exit 10 with `queued`, run `taskrock pr status <pull request>` every 5 minutes:
 
-- `MERGED`: the pull request is merged. Go on to "After the merge".
+- `MERGED`: the pull request is merged, but a queued pull request retargeted none of its children. Run `taskrock pr merge <pull request> --json` once: it prints `already_merged` and retargets them. Go on to "After the merge" with that output.
 - A `queued` finding: it is still queued. Wait and run it again.
 - Neither: the queue removed the pull request, so it is not merged. Read why from the checks of the merge group. Run `gh pr checks <pull request>`, then `gh run list --event merge_group --limit 100 --json databaseId,headBranch,conclusion --jq '.[] | select(.conclusion != "success" and (.headBranch | startswith("gh-readonly-queue/<default branch>/pr-<pull request number>-")))' | head -1` and `gh run view <databaseId> --log-failed` for that run. The filter `!= "success"` keeps a run that failed, was cancelled or timed out. When the lookup prints nothing, read the timeline of the pull request: `gh api repos/<owner>/<repo>/issues/<pull request number>/timeline --paginate --jq '.[] | select(.event | test("merge_queue")) | "\(.created_at) \(.event) \(.actor.login)"'` prints each `added_to_merge_queue` and `removed_from_merge_queue` event with its time and its actor. Handle the result as a failed check, under "When the review fails".
 - A `pr_not_open` finding: someone closed the pull request without a merge. Stop polling, follow "When a pull request is closed without a merge", and tell the user.
@@ -326,7 +326,9 @@ A push after the verdict changes the head commit. Review again.
 
 #### After the merge
 
-GitHub deletes the merged branch, and a pull request still based on a deleted branch is closed for good, so `taskrock pr merge` retargets first. After the merge, update each pull request in `retargeted` once:
+Read `retarget_failures` and `retarget_error` of the JSON of the last `taskrock pr merge` run. When `retarget_failures` is not empty or `retarget_error` is not null, run `taskrock pr merge <pull request> --json` once more. The outcome `already_merged` retargets what is left. When either is still set in that output, tell the user which pull requests it could not retarget and why, hand the task of each of them to the user with "Hand a task to the user", and review none of them.
+
+Then update each pull request in `retargeted` once:
 
 ```sh
 gh pr update-branch <child pull request>
@@ -593,10 +595,10 @@ Stop in one of these states:
 Make sure that each item is true:
 
 - You merged each pull request with `taskrock pr merge`, only after `taskrock pr status` exited 0 and printed `READY`.
-- You merged a pull request only when its base was the default branch, and `taskrock pr merge` retargeted each pull request based on its branch before the merge.
+- You merged a pull request only when its base was the default branch, and `taskrock pr merge` retargeted each pull request based on its branch, and you read `retarget_failures` and `retarget_error` of each merge and reran `taskrock pr merge` once when either was set.
 - You reviewed each head once, with the code reviewer and, when its rule applied, the security reviewer, and you posted one verdict that ends with `VERDICT: PASS head=<sha>` or `VERDICT: FAIL head=<sha>`.
 - Round 1 was a full review. Each later round checked the findings of the previous FAIL and the fix diff.
-- Every reproduced P0, P1 or P2 finding was in a FAIL. You deferred and merged none of them, and only P3 findings were under `Non-blocking`.
+- Every reproduced P0, P1 or P2 finding was in a FAIL. You never deferred or merged any of them, and only P3 findings were under `Non-blocking`.
 - You resolved each `blocking` bot thread that no reviewer reproduced with `taskrock pr threads <pull request> --resolve <id> --reason`, and you ran `taskrock pr threads <pull request> --defer` each round.
 - After each merge, you ran `gh pr update-branch` once for each pull request in `retargeted`.
 - You stacked a task only with `taskrock claim --stacked`, on the task that `taskrock ready --stacked` listed with a `stacked` base.

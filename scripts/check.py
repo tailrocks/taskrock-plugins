@@ -212,15 +212,20 @@ SKILL_NAME = re.compile(r"taskrock-(?:goal|issue|plan|triage|setup)")
 MARKUP = re.compile(r"[*_`]")
 
 
-def sentences(text: str) -> list[str]:
-    """Split Markdown into sentences. A wrapped paragraph and a folded front-matter value join up."""
+def sentences(text: str, split: bool = True) -> list[str]:
+    """Split Markdown into sentences, or into blocks with split=False.
+
+    A block is a paragraph, a list item, a table row, a heading or a line of a code fence. A wrapped
+    paragraph and a folded front-matter value join up.
+    """
     units: list[str] = []
     paragraph: list[str] = []
     fenced = False
 
     def flush() -> None:
         if paragraph:
-            units.extend(re.split(r"(?<=[.!?])\s+(?=[A-Z\"`<])", " ".join(paragraph)))
+            joined = " ".join(paragraph)
+            units.extend(re.split(r"(?<=[.!?])\s+(?=[A-Z\"`<])", joined) if split else [joined])
             paragraph.clear()
 
     for line in text.splitlines():
@@ -353,26 +358,39 @@ def merge_rule() -> None:
         problem(path, f"does not state the queue poll: {QUEUE_POLL}. A queued pull request needs it to reach MERGED")
 
 
-NEGATED_DEFER = re.compile(r"(?:never|not|no|cannot)\s+(?:be\s+)?$", re.I)
+NEGATION = re.compile(r"\b(?:never|not|no|cannot|nor)\b|n't", re.I)
+CLAUSE_END = re.compile(r"[.;:!?]\s")
 MEDIUM = re.compile(r"\bmedium\b|\bP2\b", re.I)
 DEFER_WORD = re.compile(r"\bdefer\w*", re.I)
+
+
+def defers_medium(block: str) -> bool:
+    """A block that names the medium (P2) word and has a defer word that no negation covers.
+
+    A negation covers the defer word that follows it in the same clause, so "never merged or deferred"
+    passes. A clause ends at a period, a semicolon, a colon, `!` or `?`, so a deferral in a later
+    sentence of the same block is not covered by an earlier "never".
+    """
+    flat = MARKUP.sub("", block)
+    if not MEDIUM.search(flat):
+        return False
+    for word in DEFER_WORD.finditer(flat):
+        clause = CLAUSE_END.split(flat[: word.start()])[-1]
+        if not NEGATION.search(clause):
+            return True
+    return False
 
 
 def medium_deferral() -> None:
     """No skill lets a medium (P2) finding be deferred. Only a P3 finding may be."""
     for path in sorted(SKILLS.glob("*/SKILL.md")):
-        for sentence in sentences(path.read_text()):
-            flat = MARKUP.sub("", sentence)
-            if not MEDIUM.search(flat):
-                continue
-            for word in DEFER_WORD.finditer(flat):
-                if not NEGATED_DEFER.search(flat[: word.start()]):
-                    problem(
-                        path,
-                        f"defers a medium finding: `{flat.strip()[:100]}`. A reproduced P0, P1 or P2 finding blocks "
-                        "and is never deferred: only a P3 finding may be deferred",
-                    )
-                    break
+        for block in sentences(path.read_text(), split=False):
+            if defers_medium(block):
+                problem(
+                    path,
+                    f"defers a medium finding: `{MARKUP.sub('', block).strip()[:100]}`. A reproduced P0, P1 or P2 "
+                    "finding blocks and is never deferred: only a P3 finding may be deferred",
+                )
 
 
 def title_rule() -> None:
@@ -383,8 +401,9 @@ def title_rule() -> None:
 
 
 VERSION_SKILLS = ["taskrock-goal", "taskrock-issue", "taskrock-plan", "taskrock-setup", "taskrock-triage"]
-# The first patch release of the minor that a skill needs. A skill not listed accepts patch 0.
-VERSION_FLOORS = {"taskrock-goal": 1}
+# The first patch release of a minor that a skill needs, keyed by that minor and the skill. A skill and
+# minor not listed accept patch 0, so a new minor starts with no floor.
+VERSION_FLOORS = {("0.5", "taskrock-goal"): 2}
 VERSION_GATE = (
     "It must print `taskrock {minor}.` followed by a patch number{at_least}, such as `taskrock {first}`. "
     "If the command is missing or prints an older version, stop and tell the user to install taskrock {first}. "
@@ -415,7 +434,7 @@ def version_gate(version: str) -> None:
     """Each version skill runs `taskrock --version` and names only the major.minor of VERSION.
 
     A plugin patch release changes no skill text, except that a skill in VERSION_FLOORS needs a tool patch
-    release: its gate and its "version X.Y.Z, on PATH" line name that floor. Every mention of a full
+    release of that minor: its gate and its "version X.Y.Z, on PATH" line name that floor. Every mention of a full
     `taskrock X.Y.Z` in a skill, the README or the installation page names that major.minor too. The
     title-rule example is not a version mention: it is cut out before the patterns run.
     """
@@ -425,7 +444,7 @@ def version_gate(version: str) -> None:
     for name in VERSION_SKILLS:
         path = SKILLS / name / "SKILL.md"
         text = path.read_text()
-        floor = VERSION_FLOORS.get(name, 0)
+        floor = VERSION_FLOORS.get((minor, name), 0)
         first = f"{minor}.{floor}"
         gate = VERSION_GATE.format(minor=minor, first=first, at_least=f" of {floor} or more" if floor else "")
         mentioned_versions(path, text, minor, version)

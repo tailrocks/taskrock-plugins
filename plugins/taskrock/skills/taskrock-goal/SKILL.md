@@ -38,7 +38,7 @@ This skill needs the `taskrock` command-line tool, version 0.5.0, on PATH. It al
 Each runtime that a task names must be installed and signed in on this machine.
 The input is one link to an initiative, an epic, or a project.
 
-This skill changes GitHub and starts other agent sessions. It claims and releases tasks, and it posts review comments.
+This skill changes GitHub and starts other agent sessions. It claims and releases tasks, posts review comments and resolves bot review threads.
 It merges pull requests in step 6 and closes finished parents in step 7. It files tasks for the owner, Bugs and follow-up tasks with `taskrock apply`, and it appends to the body of a parent with `taskrock edit`.
 
 Every issue that you file is part of this goal. It gets a `parent` by the parent rule of "Where a filed issue goes", and `apply` gives it the milestone of that parent, so it counts when you decide that the work is done. A draft file writes `parent = "https://github.com/<owner>/<repo>/issues/<number>"`.
@@ -162,24 +162,105 @@ A builder that could not file a Bug (its task has no parent, or its parent is fu
 
 ### 5. Review each pull request
 
-Wait for the checks:
+Read the state of the pull request:
 
 ```sh
-gh pr checks <pull request> --watch
+taskrock pr status <pull request> --json
 ```
 
-Then start the reviewer the task names: Review runtime, Review model, Review effort. It must be a different model than the builder. The reviewer:
+The exit code is 0 for `READY` and `MERGED`, 10 when the pull request waits for something that changes on its own, and 20 when someone must act. The JSON has `state`, `head`, `findings` and `threads`. Each finding has `code`, `kind` (`blocker` or `wait`), `owner`, `detail`, `next` and `items`. Each unresolved review thread has `id`, `class` (`blocking`, `deferrable` or `human`), `severity` (`P0` to `P3`, or `null` when the comment has no badge), `author` and `url`.
+
+Act on each finding by its `code`:
+
+| Code | Owner | What you do |
+|---|---|---|
+| `checks_pending` | ci | Wait 5 minutes, then read the status again. |
+| `mergeability_pending` | github | Wait 5 minutes, then read the status again. |
+| `bot_review_pending` | codex | Wait 5 minutes, then read the status again. You post no comment to start Codex: it reviews when the builder marks the pull request ready. |
+| `queued` | taskrock | The pull request is in the merge queue. Go on with step 6. |
+| `draft`, `closes_missing`, `conflict`, `check_failed`, `verdict_failed` | builder | Give the finding to a builder with "When the review fails". |
+| `verdict_missing`, `threads_blocking` | reviewer | Review the head, as below. |
+| `threads_deferrable` | taskrock | Run `taskrock pr threads <pull request> --defer`. |
+| `base_not_default` | taskrock | The pull request is stacked and its base has not merged. Wait: `taskrock pr merge` of the base retargets this pull request. |
+| `unknown_state` | taskrock | Read the status again. When the finding stays, file a Bug with "File an issue" below and tell the user. |
+| `threads_human`, `rounds_exhausted` | human | Hand the task to the user with "Hand a task to the user". |
+| `pr_not_open` | human | Follow "When a pull request is closed without a merge". |
+
+Start the reviewers on a head only when `findings` lists `verdict_missing` or `threads_blocking`, no finding has the owner `builder`, and no finding has the kind `wait`. Review each head once, in one round.
+
+#### Severity
+
+Every finding carries one severity, whether it comes from Codex or from a reviewer that you started:
+
+| Severity | Meaning |
+|---|---|
+| P0 | critical |
+| P1 | high |
+| P2 | medium |
+| P3 | low |
+
+A reproduced P0, P1 or P2 finding is always in the FAIL. A medium finding is never deferred and never merged. Only a P3 finding may be listed under `Non-blocking` in a PASS.
+
+#### Reviewers
+
+Each reviewer must run on a different model than the builder.
+
+- The code reviewer reviews every head. It is the reviewer the task names: Review runtime, Review model, Review effort.
+- The security reviewer also reviews when the routing of the task names one, or when the diff touches sandboxing, credentials, CI trust, parsers of untrusted input or new dependencies. Take it from the subagents of `routing.subagent` in the `taskrock.toml` of the organization (`gh api -H "Accept: application/vnd.github.raw+json" repos/<owner>/.github/contents/taskrock.toml`) that can review and are named for security review.
+
+The round of a head is one more than the number of FAIL verdicts that you posted on the pull request.
+
+- Round 1 is a full review. Each reviewer reports every finding that it can reproduce, with its severity, in one answer.
+- From round 2 the review is a delta review. Each reviewer checks that each finding of the previous FAIL is fixed, then reviews the fix diff, `git diff <previous head>..<head>`. A P0, P1 or P2 finding that it reproduces anywhere still blocks. It does not read the whole diff again to look for new P3 findings.
+
+Each reviewer:
 
 1. Runs every command under `Done when` again itself. It does not trust the output in the pull request.
 2. Reads the change with `gh pr diff <pull request>` against the task.
-3. Reproduces each problem it finds with a command. A finding that it did not reproduce does not count: it is left out of the verdict. Each finding that counts holds its command and the output.
-4. Answers PASS or FAIL, with its findings, and the commit it checked:
+3. Reproduces each problem it finds with a command. A finding that it did not reproduce does not count: it is left out of the verdict. Each finding that counts holds its severity, its command and the output.
+4. Rules on each `blocking` thread, as below.
+5. Answers PASS or FAIL with its findings and the commit it checked:
 
 ```sh
 gh pr view <pull request> --json headRefOid --jq .headRefOid
 ```
 
-You post the verdict. The comment ends with `VERDICT: PASS head=<sha>` or `VERDICT: FAIL head=<sha>`, where `<sha>` is the commit the reviewer checked:
+A reviewer passes when it has no reproduced P0, P1 or P2 finding.
+
+#### Bot threads
+
+The reviewers read the `threads` of `taskrock pr status <pull request> --json`. A bot is Codex or any other account whose name ends in `[bot]`.
+
+- A `blocking` thread that a reviewer reproduces goes into the FAIL, with its severity. When `severity` is `null`, the reviewer gives the finding the severity that it measured.
+- A `blocking` thread that no reviewer reproduces is resolved by you with its id from `threads`:
+
+```sh
+taskrock pr threads <pull request> --resolve <id> --reason "Not reproduced: <command and output>"
+```
+
+- Each round, settle the P3 bot threads:
+
+```sh
+taskrock pr threads <pull request> --defer
+```
+
+`taskrock pr threads` writes nothing when the pull request changed since it read it, and it never resolves a thread that a person started. Run it again after a push.
+
+#### The verdict
+
+You post one verdict for the head. It ends with `VERDICT: PASS head=<sha>` only when each reviewer that ran passed. Otherwise it ends with `VERDICT: FAIL head=<sha>`. `<sha>` is the commit that the reviewers checked:
+
+```markdown
+## Code review
+
+## Security review
+
+## Non-blocking
+
+VERDICT: PASS head=<sha>
+```
+
+`Security review` is there only when the security reviewer ran. `Non-blocking` is there only in a PASS, and lists P3 findings only.
 
 ```sh
 gh pr review <pull request> --comment --body-file <file>
@@ -187,73 +268,68 @@ gh pr review <pull request> --comment --body-file <file>
 
 #### When no reviewer can run
 
-If the task's reviewer cannot run (the runtime is missing, signed out, or the model is refused), do not merge. Leave the pull request open, do not use another reviewer, and tell the user which pull request waits and why. First give back each task stacked on this task, with "Give back the tasks stacked on a task" below: its note says that the base waits on a reviewer.
+If a reviewer that this head needs cannot run (the runtime is missing, signed out, or the model is refused), do not merge. Leave the pull request open, do not use another reviewer, and tell the user which pull request waits and why. First give back each task stacked on this task, with "Give back the tasks stacked on a task" below: its note says that the base waits on a reviewer.
 
 #### Route each finding of a FAIL verdict
 
-Send each finding that counts one of three ways:
+Send each finding that counts one of two ways:
 
 - Fix: the builder fixes it. See "When the review fails".
 - Decision: the finding needs a choice that only the owner can make. File a task for the owner with "File an issue" below, and make it block this task.
-- Follow-up: the finding is real but outside this task. File a new Task or Bug with "File an issue" below. Its `parent` and its milestone follow "Where a filed issue goes" below, with the reviewed task as the source. It does not block this task. You build it in this run: step 8 triages a Bug, and a Task is ready as it is filed.
+
+A P0, P1 or P2 finding is never a follow-up: the task waits until it is fixed or decided. After a PASS, file each P3 finding of `Non-blocking` that is real but outside this task as a new Task or Bug with "File an issue" below. Its `parent` and its milestone follow "Where a filed issue goes" below, with the reviewed task as the source. It does not block this task. You build it in this run: step 8 triages a Bug, and a Task is ready as it is filed.
 
 You file nothing without a parent and a milestone. A finding is never parked in Triage outside the link.
 
 ### 6. Merge only through this gate
 
-All four must be true:
+The gate is one command:
 
-- Every check passed.
-- The newest verdict is `VERDICT: PASS head=<sha>`, and `<sha>` equals the head commit of the pull request.
-- The body of the pull request has `Closes #<number of the task>`.
-- The base of the pull request is the default branch: `gh pr view <pull request> --json baseRefName --jq .baseRefName` prints it. A stacked pull request waits until its base merged.
+```sh
+taskrock pr status <pull request>
+```
+
+Merge only when it exits 0 and prints `READY`. Any other result is not a pass: read its findings with step 5.
 
 Merge a pull request only when its base is the default branch, and retarget every open pull request whose base is its branch to the default branch before you merge it.
 
-```sh
-gh pr view <pull request> --json headRefName --jq .headRefName
-gh pr list --base <that branch> --state open --json number --jq '.[].number'
-gh pr edit <each number> --base <default branch>
-```
+`taskrock pr merge` does both. It merges at the head commit that the status judged:
 
 ```sh
-gh pr view <pull request> --json headRefOid --jq .headRefOid
-gh api graphql -f query='query($o:String!,$r:String!,$b:String!){repository(owner:$o,name:$r){mergeQueue(branch:$b){id}}}' -f o=<owner> -f r=<repo> -f b=<default branch> --jq '.data.repository.mergeQueue.id'
+taskrock pr merge <pull request> --json
 ```
 
-The first command prints the head commit of the pull request: it is `<head commit>` below. The query prints an id when the default branch has a merge queue, and an empty line when it has none.
+It points each open pull request based on the branch of this pull request at the default branch. Then it puts the pull request in the merge queue when the default branch has one, and squash-merges it when it has none. The JSON has `outcome` (`merged`, `queued`, `already_merged`, `not_ready` or `refused`), `head`, `merge_commit` and `retargeted`, the numbers of the pull requests that it retargeted. Keep `retargeted` until the pull request is merged.
 
-When the query prints an empty line, merge at once:
+Read the exit code:
 
-```sh
-gh pr merge <pull request> --squash --match-head-commit <head commit>
-```
+- 0: the pull request is merged. Go on to "After the merge".
+- 10: the pull request is queued (`outcome` is `queued`), or it is not ready and waits (`outcome` is `not_ready`). For `not_ready`, read the status with step 5. For `queued`, poll as below.
+- 20: GitHub refused the merge (`outcome` is `refused`, and its message is on standard error), or the pull request is not ready and blocked (`not_ready`). For `not_ready`, read the status with step 5. For `refused`, tell the user the message and leave the pull request open.
+- 3: the pull request comes from a fork, and taskrock never merges a fork. Tell the user.
 
-When the query prints an id, the default branch has a merge queue. Only an id leads here. Enqueue the pull request with its head commit pinned, then poll until it is merged:
+On exit 10 with `queued`, run `taskrock pr status <pull request>` every 5 minutes:
 
-```sh
-gh pr view <pull request> --json id --jq .id
-gh api graphql -f query='mutation($id:ID!,$h:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$h}){mergeQueueEntry{position state}}}' -f id=<node id> -f h=<head commit>
-```
+- `MERGED`: the pull request is merged. Go on to "After the merge".
+- A `queued` finding: it is still queued. Wait and run it again.
+- Neither: the queue removed the pull request, so it is not merged. Read why from the checks of the merge group. Run `gh pr checks <pull request>`, then `gh run list --event merge_group --limit 100 --json databaseId,headBranch,conclusion --jq '.[] | select(.conclusion != "success" and (.headBranch | startswith("gh-readonly-queue/<default branch>/pr-<pull request number>-")))' | head -1` and `gh run view <databaseId> --log-failed` for that run. The filter `!= "success"` keeps a run that failed, was cancelled or timed out. When the lookup prints nothing, read the timeline of the pull request: `gh api repos/<owner>/<repo>/issues/<pull request number>/timeline --paginate --jq '.[] | select(.event | test("merge_queue")) | "\(.created_at) \(.event) \(.actor.login)"'` prints each `added_to_merge_queue` and `removed_from_merge_queue` event with its time and its actor. Handle the result as a failed check, under "When the review fails".
+- A `pr_not_open` finding: someone closed the pull request without a merge. Stop polling, follow "When a pull request is closed without a merge", and tell the user.
 
-`gh pr view --json state` cannot tell a queued pull request from a dequeued one: both read `OPEN`. Poll the merge queue entry instead:
-
-```sh
-gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){state mergeQueueEntry{state position}}}}' -f o=<owner> -f r=<repo> -F n=<pull request number> --jq '.data.repository.pullRequest | "\(.state) \(.mergeQueueEntry.state // "none")"'
-```
-
-Read each poll:
-
-- `MERGED ...`: the pull request is merged. Go on to step 7.
-- `OPEN <entry state>`: it is still queued. Wait 60 seconds and poll again.
-- `OPEN none`: after the enqueue, the queue removed the pull request, so it is not merged. Read why from the checks of the merge group: run `gh pr checks <pull request>`, then `gh run list --event merge_group --limit 100 --json databaseId,headBranch,conclusion --jq '.[] | select(.conclusion != "success" and (.headBranch | startswith("gh-readonly-queue/<default branch>/pr-<pull request number>-")))' | head -1` and `gh run view <databaseId> --log-failed` for that run. The filter `!= "success"` keeps a run that failed, was cancelled or timed out. When the lookup prints nothing, read the timeline of the pull request: `gh api repos/<owner>/<repo>/issues/<pull request number>/timeline --paginate --jq '.[] | select(.event | test("merge_queue")) | "\(.created_at) \(.event) \(.actor.login)"'` prints each `added_to_merge_queue` and `removed_from_merge_queue` event with its time and its actor. Handle the result as a failed check, under "When the review fails".
-- `CLOSED ...`: someone closed the pull request without a merge. Stop polling, follow "When a pull request is closed without a merge", and tell the user.
-
-After 60 polls with no change, stop and tell the user which pull request waits in the queue.
-
-GitHub deletes the merged branch, and a pull request still based on a deleted branch is closed for good, so retarget first. After the merge, start a builder for the task of each pull request that you retargeted, on its routing, with the prompt "use the skill taskrock-issue with <task link>. The task is already taken for you. Its base merged: merge the default branch, run Done when again and push." Its head commit changes, so review it again with step 5 before it passes this gate.
+After 12 polls with no change, stop and tell the user which pull request waits in the queue.
 
 A push after the verdict changes the head commit. Review again.
+
+#### After the merge
+
+GitHub deletes the merged branch, and a pull request still based on a deleted branch is closed for good, so `taskrock pr merge` retargets first. After the merge, update each pull request in `retargeted` once:
+
+```sh
+gh pr update-branch <child pull request>
+```
+
+When the command succeeds, the head commit of the child changes. Review it again with step 5 before it passes this gate.
+
+When it reports a conflict, start a builder for the task of that pull request, on its routing, with the prompt "use the skill taskrock-issue with <task link>. The task is already taken for you. Its base merged: merge the default branch, run Done when again and push." Review its new head with step 5.
 
 ### 7. Record the decision and close finished parents
 
@@ -299,17 +375,11 @@ taskrock ready <link> --json
 
 ### When the review fails
 
-Give the findings that you routed as fix to a new builder on the same branch. Review again.
+Give the findings that you routed as fix, and each finding whose owner is `builder` in step 5, to a new builder on the same branch. Review again with step 5: the next round is a delta review.
 
-Read the number of rounds from the config of the organization:
+The finding `rounds_exhausted` counts reviewed heads, the distinct heads of the pull request that have a verdict. `taskrock pr status` lists it when the count reaches `review.max_rounds` of the config of the organization and no PASS names the current head. When the file or the key is missing, `review.max_rounds` is 3. Read the findings after each verdict, before you start a builder.
 
-```sh
-gh api -H "Accept: application/vnd.github.raw+json" repos/<owner>/.github/contents/taskrock.toml
-```
-
-`review.max_rounds` is the number of FAIL verdicts that a task may collect. When the file or the key is missing, it is 3.
-
-Stop the rounds when the task has `review.max_rounds` FAIL verdicts, when the reviewer repeats a finding, or when the builder and the reviewer disagree. Then hand the task to the user with "Hand a task to the user".
+Stop the rounds when `rounds_exhausted` is listed, when the reviewer repeats a finding, or when the builder and the reviewer disagree. Then hand the task to the user with "Hand a task to the user".
 
 ### Hand a task to the user
 
@@ -511,18 +581,23 @@ Stop in one of these states:
 - `ready` is empty or lists only tasks of the run list, nothing is in progress, and the only open tasks wait on the owner: print the `waiting_on_owner` list and stop.
 - `ready` is empty, nothing is in progress, and the only Triage items under the link are the ones that `taskrock-triage` left as Needs information: print each link with its `Still needed` list, say that the reporter must answer, and stop.
 - `ready` is empty or lists only tasks of the run list, and the only tasks in progress have a pull request that waits for a reviewer that could not run: print each pull request and the reason, print each task of the run list, and stop.
-- A pull request waits in the merge queue and 60 polls of its queue entry show no change: print the pull request and say that it waits in the queue, and stop.
+- A pull request waits in the merge queue and 12 polls of its status show no change: print the pull request and say that it waits in the queue, and stop.
 
 ## Completion checks
 
 Make sure that each item is true:
 
-- Each pull request that you merged passed the four conditions of step 6, and the `<sha>` of its verdict was the head commit.
-- You merged a pull request only when its base was the default branch, and you retargeted each pull request based on its branch before the merge.
+- You merged each pull request with `taskrock pr merge`, only after `taskrock pr status` exited 0 and printed `READY`.
+- You merged a pull request only when its base was the default branch, and `taskrock pr merge` retargeted each pull request based on its branch before the merge.
+- You reviewed each head once, with the code reviewer and, when its rule applied, the security reviewer, and you posted one verdict that ends with `VERDICT: PASS head=<sha>` or `VERDICT: FAIL head=<sha>`.
+- Round 1 was a full review. Each later round checked the findings of the previous FAIL and the fix diff.
+- Every reproduced P0, P1 or P2 finding was in a FAIL. You deferred and merged none of them, and only P3 findings were under `Non-blocking`.
+- You resolved each `blocking` bot thread that no reviewer reproduced with `taskrock pr threads <pull request> --resolve <id> --reason`, and you ran `taskrock pr threads <pull request> --defer` each round.
+- After each merge, you ran `gh pr update-branch` once for each pull request in `retargeted`.
 - You stacked a task only with `taskrock claim --stacked`, on the task that `taskrock ready --stacked` listed with a `stacked` base.
-- You merged no pull request that had no reviewer.
+- You merged no pull request that had no reviewer, and none that lacked a reviewer its rule required.
 - Each finding that you routed was reproduced by the reviewer with a command.
-- You stopped a task after `review.max_rounds` FAIL verdicts and handed it to the user with a note.
+- You stopped a task when `taskrock pr status` listed `rounds_exhausted` and handed it to the user with a note.
 - You added a line to `## Decisions so far` of the parent of each merged task.
 - You and your builders wrote code only for issues that taskrock claim took.
 - You wrote the retro task when you closed an Epic.

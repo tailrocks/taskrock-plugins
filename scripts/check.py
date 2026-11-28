@@ -312,15 +312,34 @@ def stack_rule() -> None:
         problem(path, "does not state the stack rule: Merge a pull request only when its base is the default branch")
 
 
-def merge_queue_rule() -> None:
+GOAL_MUST_NAME = [
+    "taskrock pr status",
+    "taskrock pr threads",
+    "taskrock pr merge",
+    "rounds_exhausted",
+    "P0",
+    "P1",
+    "P2",
+    "P3",
+    "gh pr update-branch",
+]
+GOAL_MUST_NOT_NAME = {
+    "gh pr merge": "merges through `taskrock pr merge`, which retargets, queues and pins the head commit",
+    "@codex review": "Codex reviews when the builder marks the pull request ready, so no comment starts it",
+    "enqueuePullRequest": "`taskrock pr merge` enqueues the pull request",
+}
+
+
+def merge_rule() -> None:
+    """taskrock-goal gates and merges with taskrock pr, and states the severity rule."""
     path = SKILLS / "taskrock-goal" / "SKILL.md"
     text = path.read_text()
-    for word in ("enqueuePullRequest", "expectedHeadOid"):
+    for word in GOAL_MUST_NAME:
         if word not in text:
-            problem(path, f"does not name `{word}`, which enqueues a pull request with its head commit pinned")
-    # The enqueue also selects mergeQueueEntry, so the word alone does not prove the poll.
-    if not any("query(" in line and "mergeQueueEntry" in line for line in text.splitlines()):
-        problem(path, "does not poll `mergeQueueEntry` with a query, which tells a queued pull request from a dequeued one")
+            problem(path, f"does not name `{word}`")
+    for word, why in GOAL_MUST_NOT_NAME.items():
+        if word in text:
+            problem(path, f"names `{word}`: {why}")
 
 
 def title_rule() -> None:
@@ -419,7 +438,7 @@ def main() -> int:
     claim_rule()
     stacked_claims()
     stack_rule()
-    merge_queue_rule()
+    merge_rule()
     title_rule()
     version_gate(version)
     branches()

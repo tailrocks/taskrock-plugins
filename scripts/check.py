@@ -308,6 +308,9 @@ def merge_queue_rule() -> None:
     for word in ("enqueuePullRequest", "expectedHeadOid"):
         if word not in text:
             problem(path, f"does not name `{word}`, which enqueues a pull request with its head commit pinned")
+    # The enqueue also selects mergeQueueEntry, so the word alone does not prove the poll.
+    if not any("query(" in line and "mergeQueueEntry" in line for line in text.splitlines()):
+        problem(path, "does not poll `mergeQueueEntry` with a query, which tells a queued pull request from a dequeued one")
 
 
 def title_rule() -> None:

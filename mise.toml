@@ -24,11 +24,11 @@ run = "mise install --locked"
 # skills name, so the taskrock on PATH must be the release the plugin
 # requires. taskrock publishes no binary, so this task builds the release
 # commit into .taskrock, which Git ignores. Raise the commit with VERSION
-# when the plugin moves to a newer taskrock (v0.5.0 is a4e257c).
+# when the plugin moves to a newer taskrock (v0.5.2 is b6c9455).
 [tasks.check]
 description = "Check the plugin package: versions, skills, taskrock commands and flags"
 run = [
-  "cargo install --locked --git https://github.com/tailrocks/taskrock --rev a4e257c81f6173efada74d619e5371b13d7757e7 --root .taskrock taskrock",
+  "cargo install --locked --git https://github.com/tailrocks/taskrock --rev b6c9455498b6503a73dfbd4f7fdf2682a1460252 --root .taskrock taskrock",
   "PATH=\"$PWD/.taskrock/bin:$PATH\" taskrock --version",
   "PATH=\"$PWD/.taskrock/bin:$PATH\" python3 scripts/check.py",
 ]

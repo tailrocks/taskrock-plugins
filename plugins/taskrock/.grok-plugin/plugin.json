@@ -1,6 +1,6 @@
 {
   "name": "taskrock",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Plan work on GitHub, build one planned issue, and manage a whole goal through review and merge with the taskrock command-line tool.",
   "skills": [
     "./skills"

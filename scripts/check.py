@@ -212,15 +212,20 @@ SKILL_NAME = re.compile(r"taskrock-(?:goal|issue|plan|triage|setup)")
 MARKUP = re.compile(r"[*_`]")
 
 
-def sentences(text: str) -> list[str]:
-    """Split Markdown into sentences. A wrapped paragraph and a folded front-matter value join up."""
+def sentences(text: str, split: bool = True) -> list[str]:
+    """Split Markdown into sentences, or into blocks with split=False.
+
+    A block is a paragraph, a list item, a table row, a heading or a line of a code fence. A wrapped
+    paragraph and a folded front-matter value join up.
+    """
     units: list[str] = []
     paragraph: list[str] = []
     fenced = False
 
     def flush() -> None:
         if paragraph:
-            units.extend(re.split(r"(?<=[.!?])\s+(?=[A-Z\"`<])", " ".join(paragraph)))
+            joined = " ".join(paragraph)
+            units.extend(re.split(r"(?<=[.!?])\s+(?=[A-Z\"`<])", joined) if split else [joined])
             paragraph.clear()
 
     for line in text.splitlines():
@@ -301,8 +306,8 @@ def stacked_claims() -> None:
 
 
 STACK_RULE = (
-    "Merge a pull request only when its base is the default branch, and retarget every open "
-    "pull request whose base is its branch to the default branch before you merge it."
+    "Merge a pull request only when its base is the default branch. `taskrock pr merge` "
+    "retargets each open pull request based on its branch after the merge lands."
 )
 
 
@@ -312,15 +317,82 @@ def stack_rule() -> None:
         problem(path, "does not state the stack rule: Merge a pull request only when its base is the default branch")
 
 
-def merge_queue_rule() -> None:
+GOAL_MUST_NAME = [
+    "taskrock pr status",
+    "taskrock pr threads",
+    "taskrock pr merge",
+    "rounds_exhausted",
+    "P0",
+    "P1",
+    "P2",
+    "P3",
+    "gh pr update-branch",
+]
+VERDICT_LINE = "Reviewer: <review agent> on <review model> (<effort>)"
+VERDICT_POST = "gh pr review <pull request> --comment --body-file <file>"
+QUEUE_POLL = "On exit 10 with `queued`, run `taskrock pr status <pull request>` every 5 minutes"
+GOAL_MUST_NOT_NAME = {
+    "gh pr merge": "merges through `taskrock pr merge`, which retargets, queues and pins the head commit",
+    "@codex review": "Codex reviews when the builder marks the pull request ready, so no comment starts it",
+    "enqueuePullRequest": "`taskrock pr merge` enqueues the pull request",
+}
+
+
+def merge_rule() -> None:
+    """taskrock-goal gates and merges with taskrock pr, and states the severity rule."""
     path = SKILLS / "taskrock-goal" / "SKILL.md"
     text = path.read_text()
-    for word in ("enqueuePullRequest", "expectedHeadOid"):
+    for word in GOAL_MUST_NAME:
         if word not in text:
-            problem(path, f"does not name `{word}`, which enqueues a pull request with its head commit pinned")
-    # The enqueue also selects mergeQueueEntry, so the word alone does not prove the poll.
-    if not any("query(" in line and "mergeQueueEntry" in line for line in text.splitlines()):
-        problem(path, "does not poll `mergeQueueEntry` with a query, which tells a queued pull request from a dequeued one")
+            problem(path, f"does not name `{word}`")
+    for word, why in GOAL_MUST_NOT_NAME.items():
+        if word in text:
+            problem(path, f"names `{word}`: {why}")
+    if VERDICT_LINE not in text:
+        problem(path, f"does not put `{VERDICT_LINE}` in the verdict. taskrock counts a verdict only when its body has a line that starts with `Reviewer:`")
+    if VERDICT_POST not in text:
+        problem(path, f"does not post the verdict with `{VERDICT_POST}`. taskrock counts a verdict only from a pull request review")
+    if any("gh pr comment" in block for block in re.findall(r"```sh\n(.*?)```", text, re.S)):
+        problem(path, "runs `gh pr comment`. A verdict is a pull request review, and taskrock ignores an issue comment")
+    if QUEUE_POLL not in text:
+        problem(path, f"does not state the queue poll: {QUEUE_POLL}. A queued pull request needs it to reach MERGED")
+
+
+# A negation counts only when it directly precedes the defer word: "never deferred", "not be deferred",
+# "never merged or deferred". Words between the negation and the defer word break it.
+NEGATED = re.compile(r"(?:\b(?:never|not|no|cannot|nor)|n't)\s+(?:be\s+)?(?:\w+\s+(?:or|nor|and)\s+)*$", re.I)
+CLAUSE_END = re.compile(r"[.;:!?,]\s|\s(?:but|so)\s", re.I)
+MEDIUM = re.compile(r"\bmedium\b|\bP2\b", re.I)
+DEFER_WORD = re.compile(r"\bdefer\w*", re.I)
+
+
+def defers_medium(block: str) -> bool:
+    """A block that names the medium (P2) word and has a defer word that no negation directly precedes.
+
+    A clause ends at a period, a comma, a semicolon, a colon, `!`, `?`, or the word `but` or `so`, so a
+    deferral after any of them is not covered by an earlier "never". Inside a clause, "never merged or
+    deferred" passes, and "with no decision can be deferred" fails.
+    """
+    flat = MARKUP.sub("", block)
+    if not MEDIUM.search(flat):
+        return False
+    for clause in CLAUSE_END.split(flat):
+        for word in DEFER_WORD.finditer(clause):
+            if not NEGATED.search(clause[: word.start()]):
+                return True
+    return False
+
+
+def medium_deferral() -> None:
+    """No skill lets a medium (P2) finding be deferred. Only a P3 finding may be."""
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        for block in sentences(path.read_text(), split=False):
+            if defers_medium(block):
+                problem(
+                    path,
+                    f"defers a medium finding: `{MARKUP.sub('', block).strip()[:100]}`. A reproduced P0, P1 or P2 "
+                    "finding blocks and is never deferred: only a P3 finding may be deferred",
+                )
 
 
 def title_rule() -> None:
@@ -331,9 +403,12 @@ def title_rule() -> None:
 
 
 VERSION_SKILLS = ["taskrock-goal", "taskrock-issue", "taskrock-plan", "taskrock-setup", "taskrock-triage"]
+# The first patch release of a minor that a skill needs, keyed by that minor and the skill. A skill and
+# minor not listed accept patch 0, so a new minor starts with no floor.
+VERSION_FLOORS = {("0.5", "taskrock-goal"): 2}
 VERSION_GATE = (
-    "It must print `taskrock {minor}.` followed by a patch number, such as `taskrock {minor}.0`. "
-    "If the command is missing or prints an older version, stop and tell the user to install taskrock {minor}.0. "
+    "It must print `taskrock {minor}.` followed by a patch number{at_least}, such as `taskrock {first}`. "
+    "If the command is missing or prints an older version, stop and tell the user to install taskrock {first}. "
     "If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user "
     "to update the plugin with `claude plugin marketplace update taskrock`, then "
     "`claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the "
@@ -360,24 +435,27 @@ def mentioned_versions(path: Path, text: str, minor: str, version: str) -> None:
 def version_gate(version: str) -> None:
     """Each version skill runs `taskrock --version` and names only the major.minor of VERSION.
 
-    A plugin patch release changes no skill text. Every mention of a full `taskrock X.Y.Z` in a skill, the
-    README or the installation page names that major.minor too. The title-rule example is not a version
-    mention: it is cut out before the patterns run.
+    A plugin patch release changes no skill text, except that a skill in VERSION_FLOORS needs a tool patch
+    release of that minor: its gate and its "version X.Y.Z, on PATH" line name that floor. Every mention of a full
+    `taskrock X.Y.Z` in a skill, the README or the installation page names that major.minor too. The
+    title-rule example is not a version mention: it is cut out before the patterns run.
     """
     minor = ".".join(version.split(".")[:2])
-    gate = VERSION_GATE.format(minor=minor)
     for path in VERSION_PAGES:
         mentioned_versions(path, path.read_text(), minor, version)
     for name in VERSION_SKILLS:
         path = SKILLS / name / "SKILL.md"
         text = path.read_text()
+        floor = VERSION_FLOORS.get((minor, name), 0)
+        first = f"{minor}.{floor}"
+        gate = VERSION_GATE.format(minor=minor, first=first, at_least=f" of {floor} or more" if floor else "")
         mentioned_versions(path, text, minor, version)
-        if not VERSION_MENTIONS[0].search(text):
-            problem(path, "does not say `version X.Y.Z, on PATH`")
+        if f"version {first}, on PATH" not in text:
+            problem(path, f"does not say `version {first}, on PATH`")
         if "taskrock --version" not in text:
             problem(path, "does not run `taskrock --version`")
         if gate not in text:
-            problem(path, f"does not state the version gate: accept only taskrock {minor}.x, and tell the user to update the plugin on a newer minor or major version")
+            problem(path, f"does not state the version gate: accept only taskrock {first} or a later {minor} patch release, and tell the user to update the plugin on a newer minor or major version")
 
 
 SWITCH = re.compile(r"git (?:switch|checkout|worktree add)\b")
@@ -419,7 +497,8 @@ def main() -> int:
     claim_rule()
     stacked_claims()
     stack_rule()
-    merge_queue_rule()
+    merge_rule()
+    medium_deferral()
     title_rule()
     version_gate(version)
     branches()

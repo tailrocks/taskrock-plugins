@@ -317,9 +317,10 @@ def title_rule() -> None:
             problem(path, "does not state the title rule")
 
 
+VERSION_SKILLS = ["taskrock-goal", "taskrock-issue", "taskrock-plan", "taskrock-setup", "taskrock-triage"]
 VERSION_GATE = (
-    "It must print `taskrock 0.4.` followed by a patch number, such as `taskrock 0.4.0`. "
-    "If the command is missing or prints an older version, stop and tell the user to install taskrock 0.4.0. "
+    "It must print `taskrock {minor}.` followed by a patch number, such as `taskrock {version}`. "
+    "If the command is missing or prints an older version, stop and tell the user to install taskrock {version}. "
     "If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user "
     "to update the plugin with `claude plugin marketplace update taskrock`, then "
     "`claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the "
@@ -327,12 +328,17 @@ VERSION_GATE = (
 )
 
 
-def version_gate() -> None:
-    """Every skill that runs `taskrock --version` accepts only taskrock 0.4.x and stops on a newer minor."""
-    for path in sorted(SKILLS.glob("*/SKILL.md")):
+def version_gate(version: str) -> None:
+    """Each version skill runs `taskrock --version` and accepts only the minor version of VERSION."""
+    minor = ".".join(version.split(".")[:2])
+    gate = VERSION_GATE.format(minor=minor, version=version)
+    for name in VERSION_SKILLS:
+        path = SKILLS / name / "SKILL.md"
         text = path.read_text()
-        if "taskrock --version" in text and VERSION_GATE not in text:
-            problem(path, "runs `taskrock --version` but does not state the version gate: accept only taskrock 0.4.x, and tell the user to update the plugin on a newer minor version")
+        if "taskrock --version" not in text:
+            problem(path, "does not run `taskrock --version`")
+        if gate not in text:
+            problem(path, f"does not state the version gate: accept only taskrock {minor}.x, and tell the user to update the plugin on a newer minor or major version")
 
 
 SWITCH = re.compile(r"git (?:switch|checkout|worktree add)\b")
@@ -376,7 +382,7 @@ def main() -> int:
     stack_rule()
     merge_queue_rule()
     title_rule()
-    version_gate()
+    version_gate(version)
     branches()
     tailrocks()
     for line in problems:

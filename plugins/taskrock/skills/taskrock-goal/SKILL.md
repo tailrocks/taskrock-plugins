@@ -216,7 +216,8 @@ Read each poll:
 
 - `MERGED ...`: the pull request is merged. Go on to step 7.
 - `OPEN <entry state>`: it is still queued. Wait 60 seconds and poll again, for at most 60 polls.
-- `OPEN none`: after the enqueue, the queue removed the pull request, so it is not merged. Read why from the checks of the merge group: run `gh pr checks <pull request>`, then `gh run list --event merge_group --limit 1` and view that run. Handle the failure as a failed check, under "When the review fails".
+- `OPEN none`: after the enqueue, the queue removed the pull request, so it is not merged. Read why from the checks of the merge group: run `gh pr checks <pull request>`, then `gh run list --event merge_group --json databaseId,headBranch,conclusion --jq '.[] | select(.headBranch | startswith("gh-readonly-queue/<base>/pr-<number>-"))' | head -1` and `gh run view <databaseId> --log-failed` for that run. Handle the failure as a failed check, under "When the review fails".
+- `CLOSED ...`: someone closed the pull request without a merge. Stop polling, follow "When a pull request is closed without a merge", and tell the user.
 
 When 60 polls pass with no change, stop and tell the user which pull request waits in the queue.
 

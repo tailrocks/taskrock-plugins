@@ -229,16 +229,31 @@ The manager hands you the task again after a review that posted `VERDICT: FAIL`.
 
 ### When the base of a stacked task merged
 
-The manager hands you the task again after the base merged and it retargeted your pull request to the default branch. Bring the default branch in, prove again and push:
+The manager hands you the task again after the base merged and it retargeted your pull request to the default branch. The pull request is ready, and each push to a ready pull request starts a Codex review. Take it out of review before you push. The steps, in this order:
 
-```sh
-git fetch origin
-git switch feat/issue-<number>
-git merge origin/<default branch>
-git push origin feat/issue-<number>
-```
+1. Take the pull request out of review:
 
-Run every command under `Done when` again before the push. Write the new output into `Proof` of the pull request body with `gh pr edit <pull request> --body-file <file>`. The last line of your report is `DONE <pull request link>`.
+   ```sh
+   gh pr ready --undo <pull request>
+   ```
+
+2. Bring the default branch in:
+
+   ```sh
+   git fetch origin
+   git switch feat/issue-<number>
+   git merge origin/<default branch>
+   ```
+
+   Run every command under `Done when` again and keep the new output.
+3. Push:
+
+   ```sh
+   git push origin feat/issue-<number>
+   ```
+
+4. Write the new output into `Proof` of the pull request body, and set it with `gh pr edit <pull request> --body-file <file>`.
+5. Do step 9 again: it runs `taskrock pr status <pull request>`, fixes each `builder` finding except `draft`, and runs `gh pr ready <pull request>` once.
 
 ### When you stop before the pull request
 

@@ -94,7 +94,7 @@ For an issue link, attach each loose item in every round, not only before the ru
 gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
 ```
 
-Then load the skill `taskrock-triage` with each loose Bug or Feature now. A loose Task is built as it is.
+Then load the skill `taskrock-triage` with each loose Bug or Feature whose Status is Triage now. A loose Task, and a loose Bug or Feature whose Status is Todo, is built as it is.
 
 ### 3. Take each ready task
 
@@ -241,7 +241,7 @@ gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 gh issue edit <number> --repo <owner>/<repo> --parent <parent number>
 ```
 
-   Then load the skill `taskrock-triage` with each loose Bug or Feature, as step 2 says.
+   Then load the skill `taskrock-triage` with each loose Bug or Feature whose Status is Triage, as step 2 says.
 
 2. List the Triage items under the link:
 

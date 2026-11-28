@@ -208,32 +208,51 @@ The command posts the note as a comment on the issue and gives the task back. Th
 
 ### When taskrock gets in your way
 
-When taskrock itself is the problem (a command fails for a good input, a skill step does not work, a message misleads), file a Bug, then go on with your task.
+When taskrock itself is the problem (a command fails for a good input, a skill step does not work, a message misleads), file a Bug, then go on with your task. Do these steps in this order.
 
-```sh
-mkdir <folder>
-taskrock template Bug > <folder>/B1.md
-```
-
-Fill `<folder>/B1.md`. The front matter has `key`, `title`, `type = "Bug"` and `parent`, and no routing key. The `parent` is the full link of the parent (the epic) of your task, as `https://github.com/<owner>/<repo>/issues/<number>`, never a bare number:
-
-```toml
-parent = "https://github.com/<owner>/<repo>/issues/<number>"
-```
-
-Write every section of the template. Write a `<folder>/plan.toml` with the delivery project, in the format of `taskrock-plan`. Get the link of the parent with:
+(a) Read the parent of your task:
 
 ```sh
 gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 ```
 
+When it prints `HTTP 404` and exits 1, your task has no parent: file nothing, and put the text of the Bug in your final report. Then go on with your task.
+
+(b) Make a folder outside the repository, and write `<folder>/B1.md` from `taskrock template Bug`, with every section filled. Its front matter is a `+++` block with `key`, `title`, `type = "Bug"` and `parent`, and no routing key. The `<number>` of `parent` is the number of the parent from step (a), never a bare number:
+
+```text
++++
+key = "B1"
+title = "<what is wrong>"
+type = "Bug"
+parent = "https://github.com/<owner>/<repo>/issues/<number>"
++++
+```
+
 A title starts with a capital letter, a digit or a code span in backticks. A lowercase letter is allowed only for the name of the repository, as in "taskrock 0.2.1: …".
 
+(c) Write `<folder>/plan.toml` as its own `toml` block, with `id`, `repo` and `project` only. Never put `parent` in `plan.toml`. The `project` is the delivery project of your task. Its title is in `gh issue view <link> --json projectItems`, and its URL is:
+
 ```sh
+gh project list --owner <owner> --format json --jq '.projects[] | select(.title == "<project title>") | .url'
+```
+
+```toml
+id = "friction-<number>"
+repo = "<owner>/<repo>"
+project = "https://github.com/orgs/<owner>/projects/<project number>"
+```
+
+(d) Check the folder and file the Bug:
+
+```sh
+taskrock check <folder>
 taskrock apply <folder>
 ```
 
-The Bug lands in Triage under the epic of your task, with the milestone of that epic, which `apply` sets. When your task has no parent, file nothing and put the Bug in your final report. Then go on with your task. Use a folder outside the repository. Put the link of the Bug in your final report, above the last line.
+The Bug lands in Triage under the parent of your task, with the milestone of that parent, which `apply` sets. When `apply` stops with `no milestone <title> in <repo>. Run taskrock setup`, file nothing. Tell the user in your final report which milestone the repository lacks, and go on with your task.
+
+(e) Put the link of the Bug in your final report, above the last line, only when you filed one. Then go on with your task.
 
 ## Result
 
@@ -255,6 +274,6 @@ Make sure that each item is true:
 - For a stacked task, you merged `origin/feat/issue-<base>` while its base pull request was open, or the default branch after it merged, and the base of the pull request was `feat/issue-<base>` or the default branch.
 - The pull request body has the sections `Why`, `What`, `Proof`, and `Done when`, and the line `Closes #<number>`.
 - When you stopped before the pull request, the note has the sections `Done`, `Verified`, `State` and `Next step`, and `taskrock release <link> --note <file>` ran.
-- When you filed a friction Bug, it has the parent and the milestone of your task, and your report names its link.
+- When you filed a friction Bug, it has the parent of your task as its parent, and apply gave it that parent's milestone, and your report names its link.
 - The last line of your report is `DONE`, `BLOCKED` or `TASK_WRONG`, as described under "Result".
 - You did not merge the pull request.

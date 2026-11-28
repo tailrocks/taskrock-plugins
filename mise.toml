@@ -1,0 +1,35 @@
+min_version = { hard = "2026.11.1", soft = "2026.11.12" }
+
+[tools]
+python = "3.14.10"
+rust = { version = "1.100.0", profile = "minimal" }
+# velnor-gen writes the CI workflow. Linux takes the release asset. The
+# release has no macOS asset, so macOS builds the same commit from source.
+# The version here must equal the version in .velnor/rust-ci.lock.
+# Bump both with `velnor-gen pin-helper <version>`.
+"github:tailrocks/velnor-new" = { version = "tools-v0.1.116", asset_pattern = "velnor-gen-*-unknown-linux-musl.tar.gz", os = ["linux"] }
+"cargo:https://github.com/tailrocks/velnor-new" = { version = "rev:5e3c38d6eca734106e0f2b0e677f9191be26c012", crate = "velnor-gen", os = ["macos"] }
+
+[settings]
+lockfile = true
+
+[tasks.install]
+description = "Provision every pinned tool from mise.lock"
+run = "mise install --locked"
+
+# scripts/check.py runs `taskrock <command> --help` for every command the
+# skills name, so the taskrock on PATH must be the release the plugin
+# requires. taskrock publishes no binary, so this task builds the release
+# commit into .taskrock, which Git ignores. Raise the commit with VERSION
+# when the plugin moves to a newer taskrock (v0.4.0 is 0496274).
+[tasks.check]
+description = "Check the plugin package: versions, skills, taskrock commands and flags"
+run = [
+  "cargo install --locked --git https://github.com/tailrocks/taskrock --rev 0496274983bee0712c2cee8ce6dc048c06a56e30 --root .taskrock taskrock",
+  "PATH=\"$PWD/.taskrock/bin:$PATH\" taskrock --version",
+  "PATH=\"$PWD/.taskrock/bin:$PATH\" python3 scripts/check.py",
+]
+
+[tasks.workflows]
+description = "Fail when a generated workflow differs from velnor-gen output"
+run = "velnor-gen --root . check"

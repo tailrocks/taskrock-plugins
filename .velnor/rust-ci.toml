@@ -1,0 +1,15 @@
+# Generator input for velnor-gen. Run `velnor-gen --root . generate` after a change.
+# The repository is public and has no Cargo workspace: the only job is the
+# plugin check that CI always ran.
+runner = "ubuntu-24.04"
+hosted = true
+required_check = "Required"
+default_branch = "main"
+
+[[lint]]
+kind = "mise-task"
+id = "check"
+name = "Plugin package check"
+task = "check"
+tools = ["python", "rust"]
+timeout_minutes = 20

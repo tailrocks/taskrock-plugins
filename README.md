@@ -43,8 +43,10 @@ Always name the skill, so the agent does not pick another one.
 ## Develop
 
 ```sh
-python3 scripts/check.py
+mise run check
 ```
+
+The task builds the taskrock release that the plugin requires into `.taskrock` and runs `scripts/check.py` with it. CI runs the same task. With a matching `taskrock` already on `PATH`, `python3 scripts/check.py` alone also works.
 
 ## License
 

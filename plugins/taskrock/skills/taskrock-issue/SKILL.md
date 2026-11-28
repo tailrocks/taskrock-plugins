@@ -154,10 +154,10 @@ Fix any conflict. Then run every command under `Done when` again and keep the ne
 Look for a pull request of the branch first. A rerun of the same task finds its own:
 
 ```sh
-gh pr list --repo <owner>/<repo> --head feat/issue-<number> --state open --json url --jq '.[0].url'
+gh pr list --repo <owner>/<repo> --head feat/issue-<number> --state open --json url,isCrossRepository --jq '.[] | select(.isCrossRepository | not) | .url'
 ```
 
-When it prints a link, reuse that pull request: do not run `gh pr create`. Write the body below with the output of step 7 and set it with `gh pr edit <pull request> --body-file <file>`. When it prints nothing, create the pull request.
+The filter skips a pull request from a fork, because `--head` matches the branch name alone and a fork can use the same name. When it prints more than one link, stop and tell the user: only one pull request of the task branch may be open. When it prints one link, reuse that pull request: do not run `gh pr create`. Write the body below with the output of step 7 and set it with `gh pr edit <pull request> --body-file <file>`. When it prints nothing, create the pull request.
 
 Write the body to a file. It has four sections and one line:
 
@@ -216,7 +216,7 @@ The manager hands you the task again after a review that posted `VERDICT: FAIL`.
    gh pr ready --undo <pull request>
    ```
 
-2. Fix every finding of the FAIL verdict. Run every command under `Done when` again.
+2. Fix every finding of the FAIL verdict that the manager routed to you as Fix. The manager files a finding routed as Decision or Follow-up as its own issue: do not fix it here. When no manager routed the findings, fix every finding. Run every command under `Done when` again.
 3. Push to `feat/issue-<number>`.
 4. Resolve each bot thread that you fixed. `taskrock pr status --json <pull request>` lists each unresolved thread under `threads`, with its `id`, `severity` and `url`:
 

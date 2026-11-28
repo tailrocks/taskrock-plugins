@@ -32,7 +32,7 @@ This skill does not plan or build work. Use `taskrock-plan` to plan, `taskrock-i
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.3.0, on PATH. It also needs the `gh` command with a signed-in GitHub account that can administer the organization, and the `git` command.
+This skill needs the `taskrock` command-line tool, version 0.4.0, on PATH. It also needs the `gh` command with a signed-in GitHub account that can administer the organization, and the `git` command.
 
 This skill changes GitHub. Step 6 opens a pull request to `<owner>/.github`, and creates that repository when it is missing. Step 8 runs `taskrock setup`, which creates and fixes issue types, fields, projects, views, repository links, milestones and workflows.
 Do not run step 8 before the owner has merged the pull request and approved.
@@ -45,7 +45,7 @@ Do not run step 8 before the owner has merged the pull request and approved.
 taskrock --version
 ```
 
-It must print `taskrock 0.3.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.3.0 or newer. Do not go on.
+It must print `taskrock 0.4.` followed by a patch number, such as `taskrock 0.4.0`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.4.0. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
 
 ### 1. Route the request
 
@@ -194,7 +194,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo install --locked --git https://github.com/tailrocks/taskrock --tag v0.3.0 taskrock
+      - run: cargo install --locked --git https://github.com/tailrocks/taskrock --tag v0.4.0 taskrock
       - run: taskrock check taskrock.toml
 ```
 
@@ -259,7 +259,7 @@ Print the link of the pull request and the last output of `taskrock setup <owner
 
 Make sure that each item is true:
 
-- `taskrock --version` printed `taskrock 0.3.0` or a newer version.
+- `taskrock --version` printed `taskrock 0.4.` and a patch number.
 - You read the facts with commands and did not ask the owner for any of them.
 - You offered only the runtimes that `command -v` found, and only the models that a CLI or the Model field reported.
 - `taskrock check taskrock.toml` printed `OK`.

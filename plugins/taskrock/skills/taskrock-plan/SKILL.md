@@ -32,7 +32,7 @@ This skill only plans. Use `taskrock-issue` to build one task. Use `taskrock-goa
 
 ## Before you start
 
-This skill needs the `taskrock` command-line tool, version 0.3.0, on PATH. It also needs the `gh` command with a signed-in GitHub account.
+This skill needs the `taskrock` command-line tool, version 0.4.0, on PATH. It also needs the `gh` command with a signed-in GitHub account.
 The organization must be set up with `taskrock setup`. Its file `taskrock.toml` in the repository `<owner>/.github` describes the subagents, runtimes, models, issue types and projects. Step 2 reads it.
 
 Step 9 creates the issues on GitHub. The skill writes nothing else to GitHub.
@@ -46,7 +46,7 @@ Do not run step 9 before the user approves the tree in step 8.
 taskrock --version
 ```
 
-It must print `taskrock 0.3.0` or a newer version. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.3.0 or newer. Do not go on.
+It must print `taskrock 0.4.` followed by a patch number, such as `taskrock 0.4.0`. If the command is missing or prints an older version, stop and tell the user to install taskrock 0.4.0. If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user to update the plugin with `claude plugin marketplace update taskrock`, then `claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the session. Do not go on.
 
 ### 1. Check the link
 

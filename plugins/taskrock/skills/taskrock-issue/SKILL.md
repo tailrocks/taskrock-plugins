@@ -216,7 +216,7 @@ When taskrock itself is the problem (a command fails for a good input, a skill s
 gh api repos/<owner>/<repo>/issues/<number>/parent --jq .html_url
 ```
 
-When it prints `HTTP 404` and exits 1, your task has no parent: file nothing, and put the text of the Bug in your final report. Then go on with your task. When `taskrock apply` stops with `<link> has <n> sub-issues and GitHub allows 100: file under a child Epic of it`, file nothing and put the text of the Bug in your final report, as for a task with no parent: the manager files it.
+When it prints `HTTP 404` and exits 1, your task has no parent: file nothing, and put the text of the Bug in your final report. Then go on with your task.
 
 (b) Make a folder outside the repository, and write `<folder>/B1.md` from `taskrock template Bug`, with every section filled. Its front matter is a `+++` block with `key`, `title`, `type = "Bug"` and `parent`, and no routing key. The `<number>` of `parent` is the number of the parent from step (a), never a bare number:
 
@@ -250,7 +250,7 @@ taskrock check <folder>
 taskrock apply <folder>
 ```
 
-The Bug lands in Triage under the parent of your task, with the milestone of that parent, which `apply` sets. When `apply` stops with `no milestone <title> in <repo>. Run taskrock setup`, file nothing. Tell the user in your final report which milestone the repository lacks, and go on with your task.
+The Bug lands in Triage under the parent of your task, with the milestone of that parent, which `apply` sets. When `taskrock apply` stops with `<link> has <n> sub-issues and GitHub allows 100: file under a child Epic of it`, file nothing and put the text of the Bug in your final report, as for a task with no parent: the manager files it. When `apply` stops with `no milestone <title> in <repo>. Run taskrock setup`, file nothing. Tell the user in your final report which milestone the repository lacks, and go on with your task.
 
 (e) Put the link of the Bug in your final report, above the last line, only when you filed one. Then go on with your task.
 

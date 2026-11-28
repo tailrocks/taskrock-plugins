@@ -378,13 +378,13 @@ gh issue view <parent link> --json issueType --jq .issueType.name
 gh api repos/<owner>/<repo>/issues/<parent number> --jq .sub_issues_summary.total
 ```
 
-Go through the entries of the parent-rule list in order. For each entry, use the entry when its count is below 100, else a child Epic of it whose count is below 100. List the child Epics with their counts:
+Start at the parent that the parent rule gives. Use that issue when its count is below 100, else a child Epic of it whose count is below 100. List the child Epics with their counts:
 
 ```sh
 gh api repos/<owner>/<repo>/issues/<parent number>/sub_issues --paginate --jq '.[] | select(.type.name == "Epic") | "\(.number) \(.sub_issues_summary.total)"'
 ```
 
-When neither the entry nor a child Epic of it has room, go to the next entry of the list, the one above it. When the last entry (the goal link, or the Initiative of a project link) and its child Epics are all full, file nothing, tell the user, and go on. Never file a new Epic for this: the new Epic would itself be the 101st child, and `apply` refuses it.
+When neither that issue nor a child Epic of it has room, take the parent of that issue with `gh api repos/<owner>/<repo>/issues/<n>/parent --jq .html_url` and repeat the check on that parent, up to and including the goal link. When the goal link and its child Epics are all full, file nothing, tell the user, and go on. Never file a new Epic for this: the new Epic would itself be the 101st child, and `apply` refuses it.
 
 `apply` refuses a full parent before any `POST`, with this message: `<link> has <n> sub-issues and GitHub allows 100: file under a child Epic of it`.
 

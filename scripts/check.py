@@ -317,6 +317,24 @@ def title_rule() -> None:
             problem(path, "does not state the title rule")
 
 
+VERSION_GATE = (
+    "It must print `taskrock 0.4.` followed by a patch number, such as `taskrock 0.4.0`. "
+    "If the command is missing or prints an older version, stop and tell the user to install taskrock 0.4.0. "
+    "If it prints a newer minor or major version, this plugin is older than the tool: stop and tell the user "
+    "to update the plugin with `claude plugin marketplace update taskrock`, then "
+    "`claude plugin update taskrock@taskrock` (or the update command of their runtime), and to restart the "
+    "session. Do not go on."
+)
+
+
+def version_gate() -> None:
+    """Every skill that runs `taskrock --version` accepts only taskrock 0.4.x and stops on a newer minor."""
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        text = path.read_text()
+        if "taskrock --version" in text and VERSION_GATE not in text:
+            problem(path, "runs `taskrock --version` but does not state the version gate: accept only taskrock 0.4.x, and tell the user to update the plugin on a newer minor version")
+
+
 SWITCH = re.compile(r"git (?:switch|checkout|worktree add)\b")
 OTHER_TASK_BRANCH = re.compile(r"feat/issue-(?!<number>)")
 
@@ -358,6 +376,7 @@ def main() -> int:
     stack_rule()
     merge_queue_rule()
     title_rule()
+    version_gate()
     branches()
     tailrocks()
     for line in problems:

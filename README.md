@@ -12,7 +12,7 @@ The plugin `taskrock` for five agent CLIs: Claude Code, Codex, Grok Build, Muse 
 
 ## Requirements
 
-- `taskrock` 0.3.0 or newer on `PATH`. See the [taskrock README](https://github.com/tailrocks/taskrock#install).
+- `taskrock` 0.4.0 or a later 0.4 patch release on `PATH`. See the [taskrock README](https://github.com/tailrocks/taskrock#install).
 - `gh` signed in to GitHub, and `git`.
 
 ## Install

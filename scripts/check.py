@@ -24,7 +24,10 @@ MANIFESTS = [
 ]
 # Files where the word may appear: history and the owner's docs.
 TAILROCKS_ALLOWED = {"README.md", "CHANGELOG.md"}
-COMMAND = re.compile(r"\btaskrock ([a-z][a-z-]*)")
+# A command whose subcommand is the second word, such as `taskrock pr status`.
+TWO_WORD_COMMANDS = {"pr"}
+COMMAND_WORDS = rf"(?:{'|'.join(sorted(TWO_WORD_COMMANDS))} [a-z][a-z-]*|[a-z][a-z-]*)"
+COMMAND = re.compile(rf"\btaskrock ({COMMAND_WORDS})")
 NOT_COMMANDS = {"command", "repository", "issue", "plan", "goal", "plugin", "skills"}
 
 problems: list[str] = []
@@ -90,15 +93,15 @@ def commands() -> None:
     for path in SKILLS.glob("*/SKILL.md"):
         for block in re.findall(r"```sh\n(.*?)```", path.read_text(), re.S):
             for command in COMMAND.findall(block):
-                if command not in NOT_COMMANDS:
+                if command.split()[0] not in NOT_COMMANDS:
                     named.setdefault(command, path)
-        for command in re.findall(r"`taskrock ([a-z][a-z-]*)", path.read_text()):
-            if command not in NOT_COMMANDS:
+        for command in re.findall(rf"`taskrock ({COMMAND_WORDS})", path.read_text()):
+            if command.split()[0] not in NOT_COMMANDS:
                 named.setdefault(command, path)
     for command, path in sorted(named.items()):
         try:
             result = subprocess.run(
-                ["taskrock", command, "--help"], capture_output=True, text=True, check=False
+                ["taskrock", *command.split(), "--help"], capture_output=True, text=True, check=False
             )
         except FileNotFoundError:
             problem(path, "taskrock is not installed, so its commands cannot be checked")
@@ -111,7 +114,7 @@ GH_ISSUE = re.compile(r"gh issue create|gh issue edit[^\n]*--body")
 
 
 FLAG = re.compile(r"(?<![\w-])--[a-z][a-z-]*")
-TASKROCK_LINE = re.compile(r"\btaskrock ([a-z][a-z-]*)(.*)")
+TASKROCK_LINE = re.compile(rf"\btaskrock ({COMMAND_WORDS})(.*)")
 
 
 def flags() -> None:
@@ -123,7 +126,7 @@ def flags() -> None:
         lines += re.findall(r"`(taskrock [^`]*)`", text)
         for line in lines:
             match = TASKROCK_LINE.search(line)
-            if not match or match.group(1) in NOT_COMMANDS:
+            if not match or match.group(1).split()[0] in NOT_COMMANDS:
                 continue
             rest = re.split(r"\s(?:\||&&|;)\s", match.group(2))[0]
             for flag in FLAG.findall(rest):
@@ -133,7 +136,7 @@ def flags() -> None:
         if command not in helps:
             try:
                 result = subprocess.run(
-                    ["taskrock", command, "--help"], capture_output=True, text=True, check=False
+                    ["taskrock", *command.split(), "--help"], capture_output=True, text=True, check=False
                 )
             except FileNotFoundError:
                 return
